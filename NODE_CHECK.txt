@@ -1,1 +1,6 @@
-node --check OK
+Patch: hide pose tutorial
+
+- Added character pose hint overlay for first/second hide tutorial exposures.
+- Added staged hide tutorial logic (icon -> hybrid -> pose only).
+- Added safe pose library for rock/scissors/paper hide cues.
+- Adjusted hide cue dialogue to rely on visual reading.

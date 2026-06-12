@@ -5838,3 +5838,62 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
     padding-inline: 5px;
   }
 }
+
+
+/* 20260613 hide pose tutorial patch */
+
+.character-pose-hint {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  border: 2px solid rgba(255, 245, 173, 0.95);
+  background: linear-gradient(180deg, rgba(255, 247, 196, 0.96), rgba(234, 194, 83, 0.88));
+  box-shadow:
+    0 0 0 1px rgba(82, 45, 0, 0.55) inset,
+    0 8px 18px rgba(0, 0, 0, 0.34),
+    0 0 14px rgba(255, 239, 136, 0.32);
+  opacity: 0;
+  transform: translateY(-4px) scale(0.96);
+  transition: opacity 140ms ease, transform 140ms ease;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.character-pose-hint img {
+  width: 76%;
+  height: 76%;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.26));
+}
+
+.character-frame.has-pose-hint .character-pose-hint {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.character-frame[data-pose-hint-hand="rock"] .character-pose-hint {
+  background: linear-gradient(180deg, rgba(255, 233, 214, 0.97), rgba(232, 114, 122, 0.92));
+}
+
+.character-frame[data-pose-hint-hand="scissors"] .character-pose-hint {
+  background: linear-gradient(180deg, rgba(220, 247, 255, 0.97), rgba(88, 159, 234, 0.92));
+}
+
+.character-frame[data-pose-hint-hand="paper"] .character-pose-hint {
+  background: linear-gradient(180deg, rgba(236, 255, 220, 0.97), rgba(121, 211, 113, 0.92));
+}
+
+@media (max-width: 420px) {
+  .character-pose-hint {
+    top: 10px;
+    right: 10px;
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+  }
+}

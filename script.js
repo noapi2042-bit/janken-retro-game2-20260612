@@ -34,6 +34,45 @@ const characterImages = {
 };
 
 
+function buildCharacterEntry(mood, index, metaOverride = null) {
+  return {
+    mood,
+    index,
+    sources: characterVariant(mood, index),
+    meta: { ...characterPoseMetaFor(mood, index), ...(metaOverride || {}) },
+  };
+}
+
+const HIDE_TUTORIAL_POSE_LIBRARY = {
+  rock: [
+    {
+      ...buildCharacterEntry("excited", 2, { hand: "rock", vibe: "teach" }),
+      shot: { shot: "teach-rock", height: 166, scale: 1.13, x: -4, y: -7, rot: -1.2 },
+    },
+    {
+      ...buildCharacterEntry("excited", 5, { hand: "rock", vibe: "teach" }),
+      shot: { shot: "teach-rock-close", height: 162, scale: 1.10, x: 4, y: -6, rot: 1.0 },
+    },
+  ],
+  scissors: [
+    {
+      ...buildCharacterEntry("happy", 6, { hand: "scissors", vibe: "teach" }),
+      shot: { shot: "teach-scissors", height: 164, scale: 1.12, x: 8, y: -10, rot: 1.1 },
+    },
+  ],
+  paper: [
+    {
+      ...buildCharacterEntry("normal", 6, { hand: "paper", vibe: "teach" }),
+      shot: { shot: "teach-paper", height: 164, scale: 1.11, x: 10, y: -9, rot: 0.8 },
+    },
+    {
+      ...buildCharacterEntry("normal", 4, { hand: "paper", vibe: "teach" }),
+      shot: { shot: "teach-paper-alt", height: 160, scale: 1.08, x: 8, y: -8, rot: -1.0 },
+    },
+  ],
+};
+
+
 const CHARACTER_POSE_META = {
   normal: [
     { hand: "neutral", vibe: "calm" },
@@ -254,6 +293,13 @@ function shotPresetBucketForMood(mood, context = null) {
 }
 
 function chooseCharacterPresentation(mood, context = null) {
+  if (context?.feeling === "hide") {
+    const forced = chooseHidePosePresentation(context);
+    if (forced) {
+      return forced;
+    }
+  }
+
   const entries = characterEntriesForMood(mood);
   if (!entries.length) {
     return {
@@ -298,6 +344,102 @@ function applyCharacterPresentation(presentation) {
   characterFrame.style.setProperty("--char-x", `${shot.x || 0}px`);
   characterFrame.style.setProperty("--char-y", `${shot.y || 0}px`);
   characterFrame.style.setProperty("--char-rot", `${shot.rot || 0}deg`);
+}
+
+
+function handImageSource(hand) {
+  return hands[hand]?.image ? `${hands[hand].image}?v=${ASSET_VERSION}` : "";
+}
+
+function getFeelingSeenCount(feeling) {
+  if (!feeling || !state.feelingCueSeen) {
+    return 0;
+  }
+  return Math.max(0, Number(state.feelingCueSeen[feeling] || 0));
+}
+
+function markFeelingSeen(feeling) {
+  if (!feeling) {
+    return 0;
+  }
+  const seenBefore = getFeelingSeenCount(feeling);
+  state.feelingCueSeen[feeling] = seenBefore + 1;
+  return seenBefore;
+}
+
+function hideTeachingStageForCount(count) {
+  if (count <= 0) {
+    return "icon";
+  }
+  if (count === 1) {
+    return "hybrid";
+  }
+  return "pose";
+}
+
+function hideTeachingStageForCue(cue) {
+  return cue?.hideTeachingStage || "pose";
+}
+
+function clearCharacterPoseHint() {
+  if (characterPoseHint) {
+    characterPoseHint.hidden = true;
+  }
+  if (characterPoseHintImage) {
+    characterPoseHintImage.removeAttribute("src");
+  }
+  if (characterFrame) {
+    characterFrame.classList.remove("has-pose-hint");
+    delete characterFrame.dataset.poseHintHand;
+  }
+}
+
+function updateCharacterPoseHint(context = null) {
+  if (!characterPoseHint || !characterPoseHintImage || !characterFrame) {
+    return;
+  }
+
+  if (!context || context.feeling !== "hide") {
+    clearCharacterPoseHint();
+    return;
+  }
+
+  const stage = hideTeachingStageForCue(context);
+  const shouldShow = stage === "icon" || stage === "hybrid";
+  const hand = context.cpuHand || context.wordHand || null;
+
+  if (!shouldShow || !hand) {
+    clearCharacterPoseHint();
+    return;
+  }
+
+  const src = handImageSource(hand);
+  if (!src) {
+    clearCharacterPoseHint();
+    return;
+  }
+
+  characterPoseHintImage.src = src;
+  characterPoseHint.hidden = false;
+  characterFrame.classList.add("has-pose-hint");
+  characterFrame.dataset.poseHintHand = hand;
+}
+
+function chooseHidePosePresentation(context = null) {
+  const hand = context?.cpuHand || context?.wordHand || null;
+  const candidates = hand ? HIDE_TUTORIAL_POSE_LIBRARY[hand] || [] : [];
+  const picked = randomFromList(candidates);
+
+  if (picked) {
+    return {
+      entry: picked,
+      meta: picked.meta,
+      shot: picked.shot,
+      sources: uniqueImageSources([...(picked.sources || []), ...commonCharacterFallbackSources()]),
+    };
+  }
+
+  return null;
 }
 
 const sceneImages = {
@@ -394,7 +536,7 @@ const CHOICE_BUFFER_MS = 900;
 
 const urlParams = new URLSearchParams(window.location.search);
 const DEBUG_MODE = urlParams.has("debug");
-const ASSET_VERSION = "20260613-call3-bait-clear1";
+const ASSET_VERSION = "20260613-hide-pose-tutorial1";
 
 function assetPath(src) {
   if (!src || /^(?:data:|blob:|https?:)/.test(src) || src.includes("?v=")) {
@@ -963,6 +1105,7 @@ const state = {
   currentFeeling: null,
   lastLine: "",
   flowId: 0,
+  feelingCueSeen: {},
 };
 
 const cabinet = document.querySelector(".cabinet");
@@ -1012,6 +1155,8 @@ const nextFinalLabel = document.querySelector("#nextFinalLabel");
 const characterFrame = document.querySelector(".character-frame");
 const characterImage = document.querySelector("#characterImage");
 const characterFallback = document.querySelector("#characterFallback");
+const characterPoseHint = document.querySelector("#characterPoseHint");
+const characterPoseHintImage = document.querySelector("#characterPoseHintImage");
 
 function applyPerformanceModeClass() {
   document.documentElement.classList.toggle("is-lite-performance", LOW_POWER_MODE);
@@ -3568,11 +3713,33 @@ function lineTemplatesForCue(cue) {
   }
 
   if (cue.feeling === "hide") {
+    const stage = hideTeachingStageForCue(cue);
+
+    if (stage === "icon") {
+      return [
+        `この手を
+おぼえてね`,
+        `この手で
+続けるよ`,
+      ];
+    }
+
+    if (stage === "hybrid") {
+      return [
+        `つぎは
+この手かな`,
+        `見えた手で
+考えてね`,
+      ];
+    }
+
     return [
-      `ほんとは
-${cpu}で続きたい`,
-      `${cpu}を
-小さく言うね`,
+      `つぎは
+この手かな`,
+      `これで
+続けようかな`,
+      `見たままで
+合わせてね`,
     ];
   }
 
@@ -3733,16 +3900,19 @@ function createReadCue() {
     }
   }
 
-  const trainingFeeling = getTrainingForcedFeeling();
-  const feeling = trainingFeeling || weightedChoice(pool) || "honest";
-  let cpuHand = randomCpuHand();
-  let wordHand = cpuHand;
-  let imageMood = "worried";
-  let honest = true;
-  let ruleText = "そのまま";
-  let dynamicMode = "";
-  let avoidHand = null;
-  let secondHand = null;
+
+const trainingFeeling = getTrainingForcedFeeling();
+const feeling = trainingFeeling || weightedChoice(pool) || "honest";
+const feelingSeenCount = getFeelingSeenCount(feeling);
+let cpuHand = randomCpuHand();
+let wordHand = cpuHand;
+let imageMood = "worried";
+let honest = true;
+let ruleText = "そのまま";
+let dynamicMode = "";
+let avoidHand = null;
+let secondHand = null;
+let hideTeachingStage = null;
 
   if (feeling === "match") {
     imageMood = draw >= getChanceDrawCount() ? "draw" : "happy";
@@ -3764,9 +3934,10 @@ function createReadCue() {
   } else if (feeling === "hide") {
     cpuHand = randomCpuHand();
     wordHand = cpuHand;
-    imageMood = "smug";
+    hideTeachingStage = hideTeachingStageForCount(feelingSeenCount);
+    imageMood = cpuHand === "rock" ? "excited" : cpuHand === "scissors" ? "happy" : "normal";
     honest = false;
-    ruleText = "隠した手";
+    ruleText = hideTeachingStage === "icon" ? "隠した手（見本）" : "隠した手";
   } else if (feeling === "hesitate") {
     wordHand = randomCpuHand();
     secondHand = anotherHand(wordHand);
@@ -3800,7 +3971,11 @@ function createReadCue() {
           ? "今の言葉＝あいてが合わせる"
           : feeling === "panic"
             ? "見えてる手＝あいこ"
-            : `セリフ＋${info.label.replace("きもち：", "")}＝${handName(cpuHand)}`,
+            : feeling === "hide"
+              ? (hideTeachingStage === "icon" || hideTeachingStage === "hybrid"
+                ? "手アイコン＋ポーズ＝あいこ"
+                : "見えているポーズ＝あいこ")
+              : `セリフ＋${info.label.replace("きもち：", "")}＝${handName(cpuHand)}`,
     cpuHand,
     wordHand,
     saidHand: wordHand,
@@ -3817,8 +3992,13 @@ function createReadCue() {
     mood: imageMood,
     honest,
     presentation: "formula",
+    hideTeachingStage,
+    teachWithPose: feeling === "hide",
+    preferCloseUp: feeling === "hide",
+    targetVisualHand: cpuHand,
   };
 
+  markFeelingSeen(feeling);
   cue.line = randomLine(lineTemplatesForCue(cue));
   return cue;
 }
@@ -4492,6 +4672,7 @@ function setCharacter(mood, feeling = null, context = null) {
 
   const presentation = chooseCharacterPresentation(characterMood, context);
   applyCharacterPresentation(presentation);
+  updateCharacterPoseHint(context);
 
   loadImageDirectlyWithFallback(
     characterImage,
@@ -5324,6 +5505,7 @@ function resetScore() {
   state.medalNewRecord = false;
   state.medalNewRecordValue = 0;
   state.lastLine = "";
+  state.feelingCueSeen = {};
   setFinalJankenMode(false);
   setChanceMode(false);
   updateScore();
@@ -5339,6 +5521,7 @@ function cleanupForTitle() {
   cancelMessageTyping();
   clearResultLabel();
   clearCharacterBeat();
+  clearCharacterPoseHint();
   hideInputGuide(false);
   state.finalConfirmHand = null;
   state.showingTrueEnding = false;
@@ -5604,6 +5787,7 @@ function restartMatch() {
   cancelMessageTyping();
   clearResultLabel();
   clearCharacterBeat();
+  clearCharacterPoseHint();
   hideInputGuide(false);
   state.finalConfirmHand = null;
   closeアルバム(false);
@@ -5736,6 +5920,7 @@ async function startGame() {
   cancelMessageTyping();
   clearResultLabel();
   clearCharacterBeat();
+  clearCharacterPoseHint();
   hideInputGuide(false);
   state.finalConfirmHand = null;
   setSelectedButton();
