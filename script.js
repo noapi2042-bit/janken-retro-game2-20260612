@@ -118,7 +118,7 @@ const CHOICE_BUFFER_MS = 900;
 
 const urlParams = new URLSearchParams(window.location.search);
 const DEBUG_MODE = urlParams.has("debug");
-const ASSET_VERSION = "20260612-polish1";
+const ASSET_VERSION = "20260612-mobile-perf1";
 
 function assetPath(src) {
   if (!src || /^(?:data:|blob:|https?:)/.test(src) || src.includes("?v=")) {
@@ -164,8 +164,12 @@ function detectLowPowerDevice() {
     const cores = Number(navigator.hardwareConcurrency || 0);
     const memory = Number(navigator.deviceMemory || 0);
     const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches === true;
+    const coarsePointer = window.matchMedia?.("(pointer: coarse)")?.matches === true;
+    const touchPoints = Number(navigator.maxTouchPoints || 0);
 
-    return reducedMotion || (cores > 0 && cores <= 4) || (memory > 0 && memory <= 3);
+    // iPhone / Android はCPUコア数が多くても、GPU・発熱・バッテリー制約で重い演出に弱い。
+    // そのためタッチ端末は原則ライト表示。重い演出を見たい時だけ ?full=1 で戻す。
+    return reducedMotion || coarsePointer || touchPoints > 0 || (cores > 0 && cores <= 6) || (memory > 0 && memory <= 6);
   } catch (error) {
     return false;
   }
@@ -708,9 +712,13 @@ const characterImage = document.querySelector("#characterImage");
 const characterFallback = document.querySelector("#characterFallback");
 
 function applyPerformanceModeClass() {
+  const fullPerformance = urlParams.has("full") || urlParams.get("perf") === "full";
   document.documentElement.classList.toggle("is-lite-performance", LOW_POWER_MODE);
+  document.documentElement.classList.toggle("is-full-performance", fullPerformance);
   document.body?.classList.toggle("is-lite-performance", LOW_POWER_MODE);
+  document.body?.classList.toggle("is-full-performance", fullPerformance);
   cabinet?.classList.toggle("is-lite-performance", LOW_POWER_MODE);
+  cabinet?.classList.toggle("is-full-performance", fullPerformance);
 }
 
 function isGameplayOverlayOpen() {
@@ -1022,7 +1030,7 @@ const AudioManager = (() => {
 
   function createOneShotSfx(path, volume = 0.72) {
     const audio = new Audio(path);
-    audio.preload = "auto";
+    audio.preload = LOW_POWER_MODE ? "metadata" : "auto";
     audio.volume = volume;
     return audio;
   }
@@ -1033,7 +1041,7 @@ const AudioManager = (() => {
     }
 
     try {
-      const poolSize = LOW_POWER_MODE ? 2 : 3;
+      const poolSize = LOW_POWER_MODE ? 1 : 2;
       jankenCallSfxPool = Array.from({ length: poolSize }, () => {
         const audio = createOneShotSfx(sfxPaths.jankenCall, 0.68);
         audio.addEventListener(
@@ -1060,20 +1068,25 @@ const AudioManager = (() => {
     try {
       initAudio();
       initJankenCallSfx();
-      jankenCallSfxPool.forEach((sfx) => {
-        try {
-          sfx.load();
-        } catch (error) {
-          // Warming up audio is optional.
-        }
-      });
 
-      if (!cutinSfx) {
-        cutinSfx = createCutinSfx();
-        try {
-          cutinSfx.load();
-        } catch (error) {
-          // Cut-in sound can still be created later on demand.
+      // スマホでは初回タップ時のSFX一括loadを避ける。
+      // 再生直前ロードに任せた方が、ゲーム開始の反応が軽い。
+      if (!LOW_POWER_MODE) {
+        jankenCallSfxPool.forEach((sfx) => {
+          try {
+            sfx.load();
+          } catch (error) {
+            // Warming up audio is optional.
+          }
+        });
+
+        if (!cutinSfx) {
+          cutinSfx = createCutinSfx();
+          try {
+            cutinSfx.load();
+          } catch (error) {
+            // Cut-in sound can still be created later on demand.
+          }
         }
       }
     } catch (error) {
@@ -1130,24 +1143,28 @@ const AudioManager = (() => {
       initAudio();
       resumeContext();
       initJankenCallSfx();
-      jankenCallSfxPool.forEach((sfx) => {
-        try {
-          sfx.load();
-        } catch (error) {
-          // Loading is optional.
-        }
-      });
-      if (!cutinSfx) {
-        cutinSfx = createCutinSfx();
-        try {
-          cutinSfx.load();
-        } catch (error) {
-          // Loading is optional.
+
+      if (!LOW_POWER_MODE) {
+        jankenCallSfxPool.forEach((sfx) => {
+          try {
+            sfx.load();
+          } catch (error) {
+            // Loading is optional.
+          }
+        });
+        if (!cutinSfx) {
+          cutinSfx = createCutinSfx();
+          try {
+            cutinSfx.load();
+          } catch (error) {
+            // Loading is optional.
+          }
         }
       }
+
       // Create a near-silent sound in the user's gesture so WebAudio is unlocked on mobile.
       if (context && !muted) {
-        tone(880, 0, 0.018, { volume: 0.0008, type: "triangle" });
+        tone(880, 0, 0.014, { volume: 0.0006, type: "triangle" });
       }
     } catch (error) {
       // Audio unlock must never block the game.
@@ -1679,7 +1696,7 @@ function isアルバムItemUnlocked(item) {
 }
 
 function scheduleアルバムPreload() {
-  if (galleryPreloadQueued) {
+  if (galleryPreloadQueued || LOW_POWER_MODE) {
     return;
   }
 
@@ -1690,9 +1707,7 @@ function scheduleアルバムPreload() {
       .flatMap((item) => [item.src, item.fallbackSrc])
       .filter(Boolean);
 
-    collectImageSources({ gallery: unlockedSources }).forEach((src) => {
-      preloadImage(src);
-    });
+    preloadQueue(collectImageSources({ gallery: unlockedSources }), { decode: false });
   }, 900);
 }
 
@@ -3405,7 +3420,7 @@ function collectImageSources(sourceMap) {
   return [...new Set(Object.values(sourceMap).flatMap((value) => flattenImageSources(value)).filter(Boolean))];
 }
 
-function preloadImage(src) {
+function preloadImage(src, options = {}) {
   if (!src) {
     return Promise.resolve(null);
   }
@@ -3418,10 +3433,14 @@ function preloadImage(src) {
 
   const promise = new Promise((resolve) => {
     const img = new Image();
+    img.decoding = "async";
+    img.loading = options.loading || "lazy";
 
     img.onload = async () => {
       try {
-        if (img.decode) {
+        // iPhoneでは非表示画像の大量 decode が体感の重さにつながりやすい。
+        // ライト表示では decode をブラウザ任せにして、必要時だけ表示する。
+        if (!LOW_POWER_MODE && options.decode !== false && img.decode) {
           await img.decode();
         }
       } catch (error) {
@@ -3443,10 +3462,31 @@ function preloadImage(src) {
   return promise;
 }
 
+async function yieldToMainThread() {
+  if (globalThis.scheduler?.yield) {
+    await globalThis.scheduler.yield();
+    return;
+  }
+
+  await new Promise((resolve) => window.setTimeout(resolve, 0));
+}
+
+async function preloadQueue(urls, { budgetMs = LOW_POWER_MODE ? 14 : 28, decode = false } = {}) {
+  let sliceStart = performance.now();
+
+  for (const src of [...new Set(urls)].filter(Boolean)) {
+    await preloadImage(src, { decode });
+
+    if (performance.now() - sliceStart > budgetMs) {
+      await yieldToMainThread();
+      sliceStart = performance.now();
+    }
+  }
+}
+
 function preloadImages(sourceMap) {
-  collectImageSources(sourceMap).forEach((src) => {
-    preloadImage(src);
-  });
+  const sources = collectImageSources(sourceMap);
+  preloadQueue(sources, { decode: false });
 }
 
 function loadFirstAvailableSource(value) {
@@ -3481,13 +3521,22 @@ function loadFirstAvailableSource(value) {
 }
 
 function preloadCharacterImages() {
-  ["normal", "happy", "draw", "worried", "panic", "excited", "smug", "shocked"].forEach((mood) => {
-    const firstGroup = normalizeImageGroups(characterImages[mood])[0];
-    loadFirstAvailableSource(firstGroup);
-  });
+  if (LOW_POWER_MODE) {
+    return;
+  }
+
+  const sources = ["normal", "happy", "draw", "worried", "panic", "excited", "smug", "shocked"]
+    .map((mood) => normalizeImageGroups(characterImages[mood])[0])
+    .flat()
+    .filter(Boolean);
+  preloadQueue(sources, { decode: false });
 }
 
 function preloadSceneImages() {
+  if (LOW_POWER_MODE) {
+    return;
+  }
+
   preloadImages(sceneImages);
 }
 
@@ -3496,13 +3545,12 @@ function preloadStartupAssets() {
     return startupAssetsReady;
   }
 
+  // 手アイコンはHTML上で既に表示しているため、JS側で重複プリロードしない。
+  // スマホでは通常立ち絵1枚だけを最低限読む。
   const sources = [
-    sceneImages.intro,
     imageSourceFor(characterImages, "normal"),
-    imageSourceFor(characterImages, "happy"),
-    hands.rock.image,
-    hands.scissors.image,
-    hands.paper.image,
+    LOW_POWER_MODE ? null : sceneImages.intro,
+    LOW_POWER_MODE ? null : imageSourceFor(characterImages, "happy"),
   ].filter(Boolean);
 
   startupAssetsReady = Promise.allSettled(sources.map((src) => loadFirstAvailableSource(src)));
@@ -4883,15 +4931,18 @@ document.querySelectorAll(".choice-hand-image").forEach((image) => {
 
 useFallbackCharacter();
 applyPerformanceModeClass();
-preloadStartupAssets();
-scheduleDelayedIdleTask(() => {
-  preloadCharacterImages();
-}, LOW_POWER_MODE ? 1200 : 700);
-scheduleDelayedIdleTask(() => {
-  if (!LOW_POWER_MODE) {
+
+// スマホでは起動直後の裏プリロードを極力止める。
+// 画像は必要になった瞬間に読む方が、初動のカクつきが少ない。
+if (!LOW_POWER_MODE) {
+  preloadStartupAssets();
+  scheduleDelayedIdleTask(() => {
+    preloadCharacterImages();
+  }, 700);
+  scheduleDelayedIdleTask(() => {
     preloadSceneImages();
-  }
-}, LOW_POWER_MODE ? 3500 : 1400);
+  }, 1400);
+}
 setCharacter("normal");
 function unlockAudioFromFirstGesture() {
   AudioManager.unlockAudio();

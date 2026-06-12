@@ -6,13 +6,13 @@
   --screen-green: #a8ff70;
   --screen-bg: #041207;
   --ink: #fff7d7;
-  --asset-cabinet-shell: url("assets/images/cabinet_shell.svg?v=20260612-polish1");
-  --asset-marquee-panel: url("assets/images/marquee_panel.svg?v=20260612-polish1");
-  --asset-bezel-frame: url("assets/images/bezel_frame.svg?v=20260612-polish1");
-  --asset-control-panel: url("assets/images/control_panel_base.svg?v=20260612-polish1");
-  --asset-button-plate-rock: url("assets/images/button_plate_rock.svg?v=20260612-polish1");
-  --asset-button-plate-scissors: url("assets/images/button_plate_scissors.svg?v=20260612-polish1");
-  --asset-button-plate-paper: url("assets/images/button_plate_paper.svg?v=20260612-polish1");
+  --asset-cabinet-shell: url("assets/images/cabinet_shell.svg?v=20260612-mobile-perf1");
+  --asset-marquee-panel: url("assets/images/marquee_panel.svg?v=20260612-mobile-perf1");
+  --asset-bezel-frame: url("assets/images/bezel_frame.svg?v=20260612-mobile-perf1");
+  --asset-control-panel: url("assets/images/control_panel_base.svg?v=20260612-mobile-perf1");
+  --asset-button-plate-rock: url("assets/images/button_plate_rock.svg?v=20260612-mobile-perf1");
+  --asset-button-plate-scissors: url("assets/images/button_plate_scissors.svg?v=20260612-mobile-perf1");
+  --asset-button-plate-paper: url("assets/images/button_plate_paper.svg?v=20260612-mobile-perf1");
 }
 
 * {
@@ -4343,3 +4343,129 @@ html.is-lite-performance .choice.is-unselected,
     font-size: clamp(0.49rem, 2.2vw, 0.64rem) !important;
   }
 }
+
+
+/* ===== Mobile performance patch =====
+   iPhone / Android では見た目の豪華さより操作感を優先する。
+   ?full=1 または ?perf=full なら通常演出に戻せる。 */
+html.is-lite-performance body {
+  background: linear-gradient(135deg, #161313, #050505 70%) !important;
+}
+
+html.is-lite-performance .scanlines,
+html.is-lite-performance .crt::after,
+html.is-lite-performance .show-window::before,
+html.is-lite-performance .show-window::after,
+html.is-lite-performance .cabinet-art-rails,
+html.is-lite-performance .cabinet-art-screws,
+html.is-lite-performance .bezel::after,
+html.is-lite-performance .marquee::after {
+  display: none !important;
+}
+
+html.is-lite-performance .cabinet::after,
+html.is-lite-performance .cabinet::before,
+html.is-lite-performance .crt::before,
+html.is-lite-performance .bezel::before {
+  opacity: 0.18 !important;
+  mix-blend-mode: normal !important;
+}
+
+html.is-lite-performance .cabinet,
+html.is-lite-performance .cabinet-art-shell,
+html.is-lite-performance .marquee,
+html.is-lite-performance .bezel,
+html.is-lite-performance .crt,
+html.is-lite-performance .control-panel,
+html.is-lite-performance .character-frame,
+html.is-lite-performance .hand-card,
+html.is-lite-performance .scoreboard span,
+html.is-lite-performance .message,
+html.is-lite-performance .choice,
+html.is-lite-performance .medal-record-hud {
+  filter: none !important;
+  text-shadow: none !important;
+  will-change: auto !important;
+}
+
+html.is-lite-performance .cabinet {
+  box-shadow:
+    inset 5px 0 10px rgba(255, 190, 112, 0.12),
+    inset -6px 0 12px rgba(33, 0, 0, 0.34),
+    0 0 0 3px #160606 !important;
+}
+
+html.is-lite-performance .crt {
+  box-shadow:
+    inset 0 0 18px rgba(0, 0, 0, 0.88),
+    0 0 0 2px #211917 !important;
+}
+
+html.is-lite-performance .marquee,
+html.is-lite-performance .bezel,
+html.is-lite-performance .control-panel,
+html.is-lite-performance .character-frame,
+html.is-lite-performance .hand-card,
+html.is-lite-performance .choice,
+html.is-lite-performance .message {
+  box-shadow: none !important;
+}
+
+html.is-lite-performance .character-frame,
+html.is-lite-performance .show-window,
+html.is-lite-performance .hands,
+html.is-lite-performance .control-panel,
+html.is-lite-performance .choice-buttons,
+html.is-lite-performance .stage {
+  contain: layout paint;
+}
+
+html.is-lite-performance .character-frame img,
+html.is-lite-performance .scene-illustration,
+html.is-lite-performance .gallery-preview img,
+html.is-lite-performance .choice-hand-image,
+html.is-lite-performance .hand-result-image {
+  filter: none !important;
+  will-change: auto !important;
+  transform-style: flat !important;
+}
+
+html.is-lite-performance .character-frame img {
+  transition: none !important;
+}
+
+html.is-lite-performance .is-cinematic-cutin,
+html.is-lite-performance .cutin-psych,
+html.is-lite-performance .cutin-chance,
+html.is-lite-performance .cutin-final {
+  animation: none !important;
+}
+
+html.is-lite-performance .result-label,
+html.is-lite-performance .final-title,
+html.is-lite-performance .input-guide,
+html.is-lite-performance .mood-badge,
+html.is-lite-performance .score-pot,
+html.is-lite-performance .choice,
+html.is-lite-performance .hand-card,
+html.is-lite-performance .hand-result-image,
+html.is-lite-performance .choice-hand-image {
+  animation: none !important;
+}
+
+@media (pointer: coarse), (prefers-reduced-motion: reduce) {
+  html:not(.is-full-performance) .scanlines,
+  html:not(.is-full-performance) .crt::after,
+  html:not(.is-full-performance) .show-window::before,
+  html:not(.is-full-performance) .show-window::after,
+  html:not(.is-full-performance) .cabinet-art-rails,
+  html:not(.is-full-performance) .cabinet-art-screws,
+  html:not(.is-full-performance) .bezel::after {
+    display: none !important;
+  }
+
+  html:not(.is-full-performance) * {
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
