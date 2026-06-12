@@ -5363,7 +5363,7 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 }
 
 
-/* ===== 20260613-ui-intro-dialogue1: aiko communication rules ===== */
+/* ===== 20260613-ui-hardfix1: aiko communication rules ===== */
 .cabinet.is-cue-focus .message {
   border-color: rgba(170, 255, 220, 0.96) !important;
   color: #eafff7 !important;
@@ -5379,165 +5379,206 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 }
 
 
-/* ===== 20260613-ui-intro-dialogue1: mobile UI spacing / readable intro polish ===== */
+/* ===== 20260613-ui-hardfix1: HARD mobile layout reset ===== */
 
-/* 進行チップがセリフ枠に重ならないよう、ここで最終的に間隔を固定 */
-.aiko-guide-hud {
+/* スマホでは、上の進行チップとセリフ枠を絶対に重ねない */
+#medalRecordHud {
+  margin: 0 !important;
+}
+
+#aikoGuideHud {
   position: relative !important;
-  z-index: 3 !important;
-  width: min(96%, 360px) !important;
-  margin: 8px auto 15px !important;
+  z-index: 1 !important;
+  display: grid !important;
+  grid-template-columns: 0.88fr 1.12fr 0.9fr !important;
+  width: min(92%, 330px) !important;
+  margin: 8px auto 24px !important;
   padding: 0 !important;
-  grid-template-columns: 0.86fr 1.12fr 0.92fr !important;
-  gap: 7px !important;
+  gap: 6px !important;
   transform: none !important;
+  color: #d8fff2 !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  text-shadow: 0 0 5px currentColor !important;
+  font-size: clamp(0.58rem, 2.55vw, 0.74rem) !important;
+  line-height: 1 !important;
 }
 
-.aiko-guide-hud span {
-  min-height: 25px !important;
-  padding: 3px 7px 4px !important;
-  line-height: 1.05 !important;
-  border-width: 2px !important;
+#aikoGuideHud span {
+  min-width: 0 !important;
+  min-height: 24px !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: 3px 6px !important;
   overflow: hidden !important;
-  text-overflow: clip !important;
   white-space: nowrap !important;
+  text-overflow: clip !important;
+  border: 2px solid rgba(168, 255, 112, 0.58) !important;
+  border-radius: 999px !important;
+  background: rgba(0, 18, 8, 0.74) !important;
+  box-shadow: inset 0 0 7px rgba(168, 255, 112, 0.08) !important;
 }
 
-/* セリフ枠は必ずチップの下から始める */
-.stage {
-  padding-top: 0 !important;
-  gap: 8px !important;
+/* ここが今回の本命：進行チップの下に必ずスペースを作る */
+#aikoGuideHud + .stage {
+  padding-top: 18px !important;
+  gap: 7px !important;
+  margin-top: 0 !important;
 }
 
-.show-window {
-  min-height: min(70vw, 292px) !important;
-  padding: 82px 0 30px !important;
+/* セリフ枠はstage内の上から始まるので、stage側で余白を作ったうえで固定 */
+#aikoGuideHud + .stage .show-window {
+  min-height: min(64vw, 262px) !important;
+  padding: 70px 0 28px !important;
   overflow: visible !important;
 }
 
-.message {
+#message.message {
+  z-index: 9 !important;
   top: 0 !important;
-  width: min(95%, 344px) !important;
-  min-height: 72px !important;
-  max-height: 112px !important;
-  padding: 10px 14px 13px !important;
+  width: min(94%, 330px) !important;
+  min-height: 64px !important;
+  max-height: 96px !important;
+  padding: 9px 13px 12px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   overflow: hidden !important;
-  font-size: clamp(1.18rem, 5.35vw, 1.78rem) !important;
-  line-height: 1.17 !important;
+  font-size: clamp(1.06rem, 4.85vw, 1.55rem) !important;
+  line-height: 1.18 !important;
   letter-spacing: 0 !important;
 }
 
-.message.is-long-message {
-  font-size: clamp(1.02rem, 4.55vw, 1.42rem) !important;
-  line-height: 1.18 !important;
-}
-
-.message.is-very-long-message {
-  font-size: clamp(0.9rem, 4vw, 1.18rem) !important;
+#message.message.is-long-message {
+  font-size: clamp(0.94rem, 4.25vw, 1.25rem) !important;
   line-height: 1.2 !important;
 }
 
-/* キャラ表示を少しだけ下げ、セリフ枠の下端とかぶらないようにする */
+#message.message.is-very-long-message {
+  font-size: clamp(0.82rem, 3.75vw, 1.05rem) !important;
+  line-height: 1.22 !important;
+}
+
+#message.message::after {
+  bottom: -11px !important;
+  width: 18px !important;
+  height: 18px !important;
+}
+
 .character-frame {
-  width: min(76vw, 294px) !important;
-  height: min(53vw, 222px) !important;
+  width: min(72vw, 276px) !important;
+  height: min(49vw, 205px) !important;
+}
+
+.character-frame img {
+  max-height: 174% !important;
 }
 
 .mood-badge {
-  bottom: 12px !important;
-  z-index: 6 !important;
+  bottom: 9px !important;
+  z-index: 8 !important;
 }
 
-/* 手札と操作パネルは見切れない範囲で少し締める */
 .hands {
-  width: min(100%, 318px) !important;
-  min-height: 90px !important;
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
+  width: min(100%, 306px) !important;
+  min-height: 82px !important;
+  grid-template-columns: minmax(0, 1fr) 36px minmax(0, 1fr) !important;
+  gap: 6px !important;
+  padding-bottom: 0 !important;
 }
 
 .hand-card {
-  min-height: 86px !important;
+  min-height: 80px !important;
+  padding: 6px 5px 7px !important;
+}
+
+.hand-card strong {
+  min-height: 54px !important;
+  font-size: clamp(1.8rem, 8.8vw, 2.45rem) !important;
+}
+
+.hand-result-image {
+  width: clamp(54px, 14vw, 72px) !important;
+  height: clamp(54px, 14vw, 72px) !important;
 }
 
 .control-panel {
   margin-top: 5px !important;
   padding-top: 9px !important;
-  padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+  padding-bottom: max(7px, env(safe-area-inset-bottom)) !important;
 }
 
 .input-guide {
-  top: -26px !important;
-  z-index: 6 !important;
+  top: -24px !important;
+  z-index: 7 !important;
 }
 
-/* シーン会話も読みやすく。長い説明を避けても、文字が詰まらないようにする */
-.scene-message {
-  line-height: 1.38 !important;
-  word-break: keep-all !important;
-  overflow-wrap: anywhere !important;
+.input-guide span {
+  display: none !important;
 }
 
+.input-guide strong {
+  display: block !important;
+}
+
+/* 横幅がさらに狭い端末では、進行チップをより小さくして逃がす */
 @media (max-width: 380px) {
-  .scoreboard {
-    gap: 6px !important;
-  }
-
-  .scoreboard span {
-    min-height: 47px !important;
-  }
-
-  .aiko-guide-hud {
-    width: min(96%, 340px) !important;
-    margin: 7px auto 14px !important;
+  #aikoGuideHud {
+    width: min(92%, 312px) !important;
+    margin-bottom: 22px !important;
     gap: 5px !important;
-    font-size: clamp(0.58rem, 2.55vw, 0.72rem) !important;
+    font-size: clamp(0.52rem, 2.35vw, 0.66rem) !important;
   }
 
-  .aiko-guide-hud span {
-    min-height: 23px !important;
-    padding: 3px 4px !important;
+  #aikoGuideHud span {
+    min-height: 22px !important;
+    padding: 2px 4px !important;
   }
 
-  .show-window {
-    min-height: min(68vw, 274px) !important;
-    padding-top: 78px !important;
-    padding-bottom: 28px !important;
+  #aikoGuideHud + .stage {
+    padding-top: 16px !important;
   }
 
-  .message {
-    min-height: 66px !important;
-    max-height: 104px !important;
-    padding: 9px 12px 12px !important;
-    font-size: clamp(1.04rem, 4.85vw, 1.5rem) !important;
+  #aikoGuideHud + .stage .show-window {
+    min-height: min(61vw, 242px) !important;
+    padding-top: 66px !important;
+    padding-bottom: 24px !important;
   }
 
-  .message.is-long-message {
-    font-size: clamp(0.92rem, 4.25vw, 1.22rem) !important;
-  }
-
-  .message.is-very-long-message {
-    font-size: clamp(0.8rem, 3.75vw, 1.02rem) !important;
+  #message.message {
+    min-height: 60px !important;
+    max-height: 88px !important;
+    padding: 8px 12px 11px !important;
+    font-size: clamp(0.98rem, 4.55vw, 1.36rem) !important;
   }
 
   .character-frame {
-    width: min(72vw, 264px) !important;
-    height: min(49vw, 198px) !important;
+    width: min(70vw, 252px) !important;
+    height: min(46vw, 184px) !important;
   }
 
   .hands {
-    width: min(100%, 300px) !important;
-    min-height: 84px !important;
+    width: min(100%, 290px) !important;
+    min-height: 78px !important;
   }
 
   .hand-card {
-    min-height: 82px !important;
+    min-height: 76px !important;
   }
 
   .choice {
-    min-height: 82px !important;
+    min-height: 80px !important;
+  }
+
+  .choice-icon {
+    width: 50px !important;
+    height: 50px !important;
+  }
+
+  .choice-hand-image {
+    max-width: 45px !important;
+    max-height: 45px !important;
   }
 }

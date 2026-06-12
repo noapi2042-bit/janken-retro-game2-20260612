@@ -389,7 +389,7 @@ const CHOICE_BUFFER_MS = 900;
 
 const urlParams = new URLSearchParams(window.location.search);
 const DEBUG_MODE = urlParams.has("debug");
-const ASSET_VERSION = "20260613-ui-intro-dialogue1";
+const ASSET_VERSION = "20260613-ui-hardfix1";
 
 function assetPath(src) {
   if (!src || /^(?:data:|blob:|https?:)/.test(src) || src.includes("?v=")) {
@@ -559,10 +559,10 @@ const SCENE_INTRO_LINES = [
   "メダルを とろう！",
 ];
 const SCENE_PLAYER_WIN_LINES = [
-  "あなたの勝ちだね。ちゃんと見てくれてたんだ。",
-  "でも、あいこなら、もう少し続けられるよ。",
-  "私のきもちも、少しだけ読んでみて。",
-  "また、あいこから始めよう？",
+  "すごいね、あなたの勝ちだよ。楽しかったから、また勝負してね！",
+  "まけちゃった…。でもすごく楽しかったよ。また遊びに来てね。",
+  "あなたの勝ちだね。次はもっと強くなって待ってるね！",
+  "くやしいけど、楽しかったよ。よかったら、また勝負しよ？",
 ];
 const SCENE_PLAYER_LOSE_LINES = [
   "ここまで遊んでくれてありがとう。もう一回だけ、勝負してみる？",
@@ -3804,14 +3804,13 @@ async function showIntroThenReady() {
   setButtonsEnabled(false);
   resetRoundView();
 
-  // 最初だけは少し丁寧に読ませる。
-  // ここで目的とメダルの増え方を、説明っぽくなりすぎない言葉で伝える。
+  // 最初だけは、プレイヤーが目的を読めるように丁寧に流す。
   showMessage("まずは 30まい。\nメダルをあつめよう", undefined, {
     typewriter: true,
     maxDuration: 3400,
     speed: 88,
   });
-  await wait(2150);
+  await wait(2200);
 
   if (flowId !== state.flowId || !state.started || state.ended) {
     return;
@@ -4518,7 +4517,6 @@ function typeSceneLine(text) {
 
     const fullText = String(text || "");
     const currentId = sceneTypingId;
-    // クリア後の会話は、ルール説明も兼ねるので少しだけゆっくり読ませる。
     const speed = fullText.length > 28 ? 36 : 46;
     let index = 0;
 
