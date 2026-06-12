@@ -1,6 +1,13 @@
-Patch: hide pose tutorial
+Data audit clean patch
 
-- Added character pose hint overlay for first/second hide tutorial exposures.
-- Added staged hide tutorial logic (icon -> hybrid -> pose only).
-- Added safe pose library for rock/scissors/paper hide cues.
-- Adjusted hide cue dialogue to rely on visual reading.
+Version: 20260613-data-audit-clean1
+
+Checked:
+- node --check: OK
+- HIDE_TUTORIAL_POSE_LIBRARY after CHARACTER_POSE_META: OK
+- bait wording double-negative removal: OK
+- sway text flow restored: OK
+- long idle rhythm stabilization restored: OK
+
+node output:
+node --check OK

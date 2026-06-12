@@ -6,13 +6,13 @@
   --screen-green: #a8ff70;
   --screen-bg: #041207;
   --ink: #fff7d7;
-  --asset-cabinet-shell: url("assets/images/cabinet_shell.svg?v=20260613-mobile-ui-tight1");
-  --asset-marquee-panel: url("assets/images/marquee_panel.svg?v=20260613-mobile-ui-tight1");
-  --asset-bezel-frame: url("assets/images/bezel_frame.svg?v=20260613-mobile-ui-tight1");
-  --asset-control-panel: url("assets/images/control_panel_base.svg?v=20260613-mobile-ui-tight1");
-  --asset-button-plate-rock: url("assets/images/button_plate_rock.svg?v=20260613-mobile-ui-tight1");
-  --asset-button-plate-scissors: url("assets/images/button_plate_scissors.svg?v=20260613-mobile-ui-tight1");
-  --asset-button-plate-paper: url("assets/images/button_plate_paper.svg?v=20260613-mobile-ui-tight1");
+  --asset-cabinet-shell: url("assets/images/cabinet_shell.svg?v=20260613-data-audit-clean1");
+  --asset-marquee-panel: url("assets/images/marquee_panel.svg?v=20260613-data-audit-clean1");
+  --asset-bezel-frame: url("assets/images/bezel_frame.svg?v=20260613-data-audit-clean1");
+  --asset-control-panel: url("assets/images/control_panel_base.svg?v=20260613-data-audit-clean1");
+  --asset-button-plate-rock: url("assets/images/button_plate_rock.svg?v=20260613-data-audit-clean1");
+  --asset-button-plate-scissors: url("assets/images/button_plate_scissors.svg?v=20260613-data-audit-clean1");
+  --asset-button-plate-paper: url("assets/images/button_plate_paper.svg?v=20260613-data-audit-clean1");
 }
 
 * {
@@ -5309,7 +5309,7 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 }
 
 
-/* ===== 20260613-presentation-polish1: character presentation polish ===== */
+/* ===== 20260613-data-audit-clean1: character presentation polish ===== */
 .character-frame {
   --char-height: 152%;
   --char-scale: 1;
@@ -5363,7 +5363,7 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 }
 
 
-/* ===== 20260613-call3-bait-clear1: aiko communication rules ===== */
+/* ===== 20260613-data-audit-clean1: aiko communication rules ===== */
 .cabinet.is-cue-focus .message {
   border-color: rgba(170, 255, 220, 0.96) !important;
   color: #eafff7 !important;
@@ -5379,7 +5379,7 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 }
 
 
-/* ===== 20260613-call3-bait-clear1: HARD mobile layout reset ===== */
+/* ===== 20260613-data-audit-clean1: HARD mobile layout reset ===== */
 
 /* スマホでは、上の進行チップとセリフ枠を絶対に重ねない */
 #medalRecordHud {
@@ -5584,7 +5584,7 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 }
 
 
-/* ===== 20260613-call3-bait-clear1: clean mobile UI without overlapping progress chips ===== */
+/* ===== 20260613-data-audit-clean1: clean mobile UI without overlapping progress chips ===== */
 
 /* 進行チップがセリフ枠に重なり続けたため、通常画面から外す。
    目的・あいこ・チャンス情報は、セリフとスコア表示で伝える。 */
@@ -5701,7 +5701,7 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 }
 
 
-/* ===== 20260613-call3-bait-clear1: special cue notice / moving hesitation ===== */
+/* ===== 20260613-data-audit-clean1: special cue notice / moving hesitation ===== */
 
 .cabinet.is-cue-special .show-window::before {
   opacity: 1 !important;
@@ -5782,7 +5782,7 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 }
 
 
-/* ===== 20260613-call3-bait-clear1: panic pre-reveal + complete run ===== */
+/* ===== 20260613-data-audit-clean1: panic pre-reveal + complete run ===== */
 
 .hand-card.is-pre-revealed {
   border-color: rgba(255, 238, 98, 0.98) !important;
@@ -5896,4 +5896,33 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
     height: 52px;
     border-radius: 16px;
   }
+}
+
+
+/* ===== 20260613-data-audit-clean1: まよい文字流し / 長時間待機後の掛け声安定 ===== */
+
+.cabinet.is-cue-sway .message.is-sway-text-flow {
+  animation: sway-text-flow-in 0.48s cubic-bezier(0.16, 0.9, 0.24, 1) both;
+}
+
+@keyframes sway-text-flow-in {
+  0% {
+    opacity: 0.2;
+    transform: translateX(-50%) translateY(10px) scale(0.985);
+    filter: blur(1px);
+  }
+  48% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-2px) scale(1.018);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+html.is-lite-performance .cabinet.is-cue-sway .message.is-sway-text-flow {
+  animation-duration: 0.34s;
 }

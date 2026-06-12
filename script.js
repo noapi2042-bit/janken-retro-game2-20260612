@@ -43,36 +43,6 @@ function buildCharacterEntry(mood, index, metaOverride = null) {
   };
 }
 
-const HIDE_TUTORIAL_POSE_LIBRARY = {
-  rock: [
-    {
-      ...buildCharacterEntry("excited", 2, { hand: "rock", vibe: "teach" }),
-      shot: { shot: "teach-rock", height: 166, scale: 1.13, x: -4, y: -7, rot: -1.2 },
-    },
-    {
-      ...buildCharacterEntry("excited", 5, { hand: "rock", vibe: "teach" }),
-      shot: { shot: "teach-rock-close", height: 162, scale: 1.10, x: 4, y: -6, rot: 1.0 },
-    },
-  ],
-  scissors: [
-    {
-      ...buildCharacterEntry("happy", 6, { hand: "scissors", vibe: "teach" }),
-      shot: { shot: "teach-scissors", height: 164, scale: 1.12, x: 8, y: -10, rot: 1.1 },
-    },
-  ],
-  paper: [
-    {
-      ...buildCharacterEntry("normal", 6, { hand: "paper", vibe: "teach" }),
-      shot: { shot: "teach-paper", height: 164, scale: 1.11, x: 10, y: -9, rot: 0.8 },
-    },
-    {
-      ...buildCharacterEntry("normal", 4, { hand: "paper", vibe: "teach" }),
-      shot: { shot: "teach-paper-alt", height: 160, scale: 1.08, x: 8, y: -8, rot: -1.0 },
-    },
-  ],
-};
-
-
 const CHARACTER_POSE_META = {
   normal: [
     { hand: "neutral", vibe: "calm" },
@@ -148,6 +118,37 @@ const CHARACTER_POSE_META = {
     { hand: "neutral", vibe: "heart" },
     { hand: "neutral", vibe: "small" },
     { hand: "neutral", vibe: "quiet" },
+  ],
+};
+
+
+
+const HIDE_TUTORIAL_POSE_LIBRARY = {
+  rock: [
+    {
+      ...buildCharacterEntry("excited", 2, { hand: "rock", vibe: "teach" }),
+      shot: { shot: "teach-rock", height: 166, scale: 1.13, x: -4, y: -7, rot: -1.2 },
+    },
+    {
+      ...buildCharacterEntry("excited", 5, { hand: "rock", vibe: "teach" }),
+      shot: { shot: "teach-rock-close", height: 162, scale: 1.10, x: 4, y: -6, rot: 1.0 },
+    },
+  ],
+  scissors: [
+    {
+      ...buildCharacterEntry("happy", 6, { hand: "scissors", vibe: "teach" }),
+      shot: { shot: "teach-scissors", height: 164, scale: 1.12, x: 8, y: -10, rot: 1.1 },
+    },
+  ],
+  paper: [
+    {
+      ...buildCharacterEntry("normal", 6, { hand: "paper", vibe: "teach" }),
+      shot: { shot: "teach-paper", height: 164, scale: 1.11, x: 10, y: -9, rot: 0.8 },
+    },
+    {
+      ...buildCharacterEntry("normal", 4, { hand: "paper", vibe: "teach" }),
+      shot: { shot: "teach-paper-alt", height: 160, scale: 1.08, x: 8, y: -8, rot: -1.0 },
+    },
   ],
 };
 
@@ -524,6 +525,7 @@ let galleryIndex = 0;
 let galleryRequestId = 0;
 let galleryPreloadQueued = false;
 let lastChoiceActivationAt = 0;
+let lastInputReadyAt = 0;
 let pendingChoiceHand = null;
 let pendingChoiceAt = 0;
 let pendingChoiceTimer = null;
@@ -536,7 +538,7 @@ const CHOICE_BUFFER_MS = 900;
 
 const urlParams = new URLSearchParams(window.location.search);
 const DEBUG_MODE = urlParams.has("debug");
-const ASSET_VERSION = "20260613-hide-pose-tutorial1";
+const ASSET_VERSION = "20260613-data-audit-clean1";
 
 function assetPath(src) {
   if (!src || /^(?:data:|blob:|https?:)/.test(src) || src.includes("?v=")) {
@@ -671,8 +673,8 @@ const FEELING_LABELS = {
   },
   bait: {
     label: "きもち：ためす",
-    rule: "見えた手を外す",
-    hint: "言った手は選ばない",
+    rule: "言った手を外す",
+    hint: "言った手以外を出す",
   },
   mirror: {
     label: "きもち：みてる",
@@ -1822,15 +1824,16 @@ const AudioManager = (() => {
     }
   }
 
-  function playJankenCallSfx(fallbackType = "call1") {
+  function playJankenCallSfx(fallbackType = "call1", options = {}) {
     try {
       if (muted) {
         return;
       }
 
       // BGMとケンカしないように、1拍目・2拍目は軽い電子音だけ。
-      // アップロードされた se_janken_call.mp3 は、ぽん！/しょ！ の3拍目だけに使う。
-      if (fallbackType !== "call3") {
+      // se_janken_call.mp3 は、ぽん！/しょ！ の3拍目だけに使う。
+      // 長時間待機後はスマホでmp3復帰が遅れることがあるため、その1回だけ軽い電子音に戻す。
+      if (fallbackType !== "call3" || options.preferTone) {
         playSound(fallbackType);
         return;
       }
@@ -2051,6 +2054,10 @@ function triggerCinematicCutIn(type) {
 
 function setButtonsEnabled(enabled) {
   choiceButtonGroup?.classList.toggle("is-input-locked", !enabled);
+  if (enabled && state.started && !state.busy && !state.ended) {
+    // 入力待ちになった時刻を記録。長時間放置後の音声復帰・タイマーずれ対策に使う。
+    lastInputReadyAt = performance.now();
+  }
   choiceButtons.forEach((button) => {
     const shouldDisableElement = !enabled && !state.started;
     button.disabled = shouldDisableElement;
@@ -3157,7 +3164,7 @@ function routeHintLinesForCurrentTarget() {
   }
 
   if (targetRoute === "finalWin" || phase === "final" || phase === "near") {
-    return ["まよいは\n今の言葉", "ためすは\n見えた手を外す", "よく見れば\nまだ続くよ", "最後まで\nあわせられる？"];
+    return ["まよいは\n今の言葉", "ためすは\n言った手以外", "よく見れば\nまだ続くよ", "最後まで\nあわせられる？"];
   }
 
   if (targetRoute === "chanceWin" || phase === "aware" || phase === "read") {
@@ -3445,9 +3452,9 @@ function formatDebugAnswer(answer = state.debugAnswer) {
       `セリフ：${line}`,
       `きもち：${feelingText}`,
       `読み方：${ruleText}`,
-      "本心：見えた手を外したら合わせる",
-      `見えた手：${avoidName}`,
-      `成功：${avoidName}を選ばなければあいこ`,
+      "本心：言った手を外したら合わせる",
+      `言った手：${avoidName}`,
+      `あいこ：${avoidName}以外ならOK`,
       answer.resolvedPlayerHand ? `あなた：${playerName}` : "あなた：まだ未選択",
       answer.cpuHand ? `あいて：${cpuName}` : "あいて：選んだ手に合わせる",
     ].join("\n");
@@ -3597,10 +3604,12 @@ function advanceSwayCue(cue, first = false) {
   cue.line = swayCueLine(cue);
   setDebugAnswerFromPsychEvent(cue, cue.line);
   showMessage(cue.line, specialCueMoodClasses(cue), {
-    typewriter: first,
-    maxDuration: first ? 1550 : 900,
-    speed: first ? 54 : 32,
+    // まよいは「文字が切り替わった」ことに気づきやすいよう、毎回流して見せる。
+    typewriter: true,
+    maxDuration: first ? 1550 : 1180,
+    speed: first ? 54 : 48,
   });
+  restartClassAnimation(message, "is-sway-text-flow");
 }
 
 function startSwayCueMotion(cue) {
@@ -3698,9 +3707,12 @@ function lineTemplatesForCue(cue) {
 
   if (cue.feeling === "bait") {
     return [
-      `${word}は\nひっかけだよ`,
-      `${word}に\n見えても外して`,
-      `${word}は\n選ばないで`,
+      `${word}に
+しようかな`,
+      `${word}で
+いこうかな`,
+      `${word}を
+出すかも`,
     ];
   }
 
@@ -3966,7 +3978,7 @@ let hideTeachingStage = null;
     formulaText: dynamicMode === "mirror"
       ? "あなたの手＝あいての手"
       : dynamicMode === "avoid"
-        ? `${handName(avoidHand)}を外す＝あいてが合わせる`
+        ? `言った手以外＝あいこ`
         : dynamicMode === "sway"
           ? "今の言葉＝あいてが合わせる"
           : feeling === "panic"
@@ -5390,10 +5402,10 @@ function chooseCpuHand(player, activeEvent = null) {
       event.resolvedPlayerHand = player;
 
       if (avoidHand && player && player !== avoidHand) {
-        // 見せ手を外せたら、必ず相手が合わせてあいこにする。
+        // 言った手を外せたら、必ず相手が合わせてあいこにする。
         cpuHand = player;
       } else if (avoidHand && player === avoidHand) {
-        // 見せ手に引っかかった時だけ、相手に取られる。
+        // 言った手をそのまま選んだ時だけ、相手に取られる。
         cpuHand = handThatBeats(player) || randomCpuHand();
       } else if (player) {
         // 念のため avoidHand が取れない場合も、理不尽なランダム勝敗にしない。
@@ -5973,17 +5985,30 @@ async function playRound(player) {
   };
 
   clearPendingChoice();
+  const idleBeforeChoiceMs = lastInputReadyAt ? performance.now() - lastInputReadyAt : 0;
+  const recoverFromLongIdle = idleBeforeChoiceMs >= 18000;
   state.busy = true;
   const flowId = state.flowId;
   // 表示中の心理イベントを、ラウンド開始時点で確実に確保する。
   // resetRoundView() やキャラ更新の影響でイベントが消えても、このラウンドだけは同じ判定を使う。
   const activePsychEvent = state.psychEvent ? { ...state.psychEvent } : null;
   stopPsychCueMotion();
+  cancelMessageTyping();
+  cancelClassAnimation(message, "is-sway-text-flow");
   state.finalConfirmHand = null;
   cabinet.classList.remove("is-final-confirm");
   stopChanceMessages();
   resetRoundView();
   AudioManager.playSound("select");
+  if (recoverFromLongIdle) {
+    // 長時間待った後はスマホの音声・タイマーが寝ていることがあるので、掛け声前に少し整える。
+    AudioManager.prepareForGameplay();
+    await wait(36);
+    if (flowId !== state.flowId) {
+      endPlayRoundTimer();
+      return;
+    }
+  }
   setSelectedButton(player);
   setButtonsEnabled(false);
 
@@ -6007,7 +6032,7 @@ async function playRound(player) {
     const callSound = index === 0 ? "call1" : "call2";
     const beatClass = index === 0 ? "is-beat-1" : "is-beat-2";
     showMessage(call, "is-calling");
-    AudioManager.playJankenCallSfx(callSound);
+    AudioManager.playJankenCallSfx(callSound, { preferTone: recoverFromLongIdle });
     playCharacterBeat(beatClass);
     await wait(jankenTempo.callStep);
     if (flowId !== state.flowId) {
@@ -6017,7 +6042,7 @@ async function playRound(player) {
   }
 
   showMessage(revealCall, "is-calling");
-  AudioManager.playJankenCallSfx("call3");
+  AudioManager.playJankenCallSfx("call3", { preferTone: recoverFromLongIdle });
   playCharacterBeat("is-beat-3");
   await wait(jankenTempo.revealToHand);
   if (flowId !== state.flowId) {
