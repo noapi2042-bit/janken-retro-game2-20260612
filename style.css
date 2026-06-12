@@ -6,13 +6,13 @@
   --screen-green: #a8ff70;
   --screen-bg: #041207;
   --ink: #fff7d7;
-  --asset-cabinet-shell: url("assets/images/cabinet_shell.svg?v=20260612-mobile-audit-fix2");
-  --asset-marquee-panel: url("assets/images/marquee_panel.svg?v=20260612-mobile-audit-fix2");
-  --asset-bezel-frame: url("assets/images/bezel_frame.svg?v=20260612-mobile-audit-fix2");
-  --asset-control-panel: url("assets/images/control_panel_base.svg?v=20260612-mobile-audit-fix2");
-  --asset-button-plate-rock: url("assets/images/button_plate_rock.svg?v=20260612-mobile-audit-fix2");
-  --asset-button-plate-scissors: url("assets/images/button_plate_scissors.svg?v=20260612-mobile-audit-fix2");
-  --asset-button-plate-paper: url("assets/images/button_plate_paper.svg?v=20260612-mobile-audit-fix2");
+  --asset-cabinet-shell: url("assets/images/cabinet_shell.svg?v=20260613-flow-audio-assets1");
+  --asset-marquee-panel: url("assets/images/marquee_panel.svg?v=20260613-flow-audio-assets1");
+  --asset-bezel-frame: url("assets/images/bezel_frame.svg?v=20260613-flow-audio-assets1");
+  --asset-control-panel: url("assets/images/control_panel_base.svg?v=20260613-flow-audio-assets1");
+  --asset-button-plate-rock: url("assets/images/button_plate_rock.svg?v=20260613-flow-audio-assets1");
+  --asset-button-plate-scissors: url("assets/images/button_plate_scissors.svg?v=20260613-flow-audio-assets1");
+  --asset-button-plate-paper: url("assets/images/button_plate_paper.svg?v=20260613-flow-audio-assets1");
 }
 
 * {
@@ -4522,5 +4522,260 @@ html.is-lite-performance .medal-record-hud:not(.is-score-attack) {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
+  }
+}
+
+
+/* ===== Deep audit fix: relationship/condition HUD + SH-51C lite hardening ===== */
+.scoreboard {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 5px !important;
+}
+
+.score-draw {
+  display: grid !important;
+  color: #8df5ff !important;
+  border-color: rgba(141, 245, 255, 0.74) !important;
+}
+
+.aiko-guide-hud {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 4px;
+  margin: 5px 0 0;
+  padding: 4px 6px;
+  color: #d8fff2;
+  background: rgba(0, 18, 8, 0.5);
+  border: 1px solid rgba(168, 255, 112, 0.52);
+  border-radius: 6px;
+  font-size: clamp(0.54rem, 2.35vw, 0.74rem);
+  line-height: 1.05;
+  text-align: center;
+  text-shadow: 0 0 6px currentColor;
+}
+
+.aiko-guide-hud span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.aiko-guide-hud.is-chance {
+  color: #fff27a;
+  border-color: rgba(255, 236, 96, 0.86);
+  background: rgba(42, 25, 0, 0.56);
+}
+
+.aiko-guide-hud.is-final {
+  color: #ffd2d2;
+  border-color: rgba(255, 116, 116, 0.86);
+  background: rgba(38, 4, 12, 0.58);
+}
+
+.aiko-guide-hud.is-score-attack {
+  color: #fff27a;
+}
+
+.mood-badge[data-mood="bait"] {
+  background: linear-gradient(#fff0a8, #e2b043) !important;
+}
+
+.mood-badge[data-mood="hide"] {
+  background: linear-gradient(#ffe6a8, #ce9a3a) !important;
+}
+
+html.is-lite-performance .scoreboard {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 4px !important;
+  font-size: clamp(0.52rem, 2.45vw, 0.68rem) !important;
+  text-shadow: none !important;
+}
+
+html.is-lite-performance .scoreboard span {
+  min-height: 36px !important;
+  padding: 4px 2px !important;
+  border-width: 1px !important;
+  text-shadow: none !important;
+  background: rgba(0, 0, 0, 0.18) !important;
+}
+
+html.is-lite-performance .scoreboard strong {
+  font-size: clamp(0.72rem, 3.1vw, 0.98rem) !important;
+}
+
+html.is-lite-performance .aiko-guide-hud {
+  margin-top: 4px !important;
+  padding: 3px 4px !important;
+  gap: 3px !important;
+  font-size: clamp(0.48rem, 2.15vw, 0.62rem) !important;
+  line-height: 1.05 !important;
+  text-shadow: none !important;
+  box-shadow: none !important;
+}
+
+html.is-lite-performance .cabinet::before,
+html.is-lite-performance .cabinet::after,
+html.is-lite-performance .control-panel::before,
+html.is-lite-performance .control-panel::after,
+html.is-lite-performance .choice::before,
+html.is-lite-performance .choice::after,
+html.is-lite-performance .hand-card::after,
+html.is-lite-performance .crt::before,
+html.is-lite-performance .message::after {
+  display: none !important;
+}
+
+html.is-lite-performance .cabinet {
+  background: linear-gradient(#d83a2f, #7b130f) !important;
+  border-inline-width: 5px !important;
+  box-shadow: none !important;
+}
+
+html.is-lite-performance .bezel {
+  padding: 9px 7px 10px !important;
+  margin-top: 6px !important;
+  background: #111 !important;
+  border-width: 4px !important;
+}
+
+html.is-lite-performance .crt {
+  padding: 10px 9px 10px !important;
+  border-radius: 22px !important;
+}
+
+html.is-lite-performance .choice,
+html.is-lite-performance .choice.is-selected,
+html.is-lite-performance .choice.is-pressing {
+  animation: none !important;
+  transition: none !important;
+  transform: none !important;
+  filter: none !important;
+  box-shadow: none !important;
+  border-bottom-width: 4px !important;
+}
+
+html.is-lite-performance .choice-icon,
+html.is-lite-performance .choice.is-selected .choice-icon {
+  box-shadow: none !important;
+}
+
+html.is-lite-performance .choice.is-selected {
+  outline: 3px solid rgba(255, 242, 122, 0.9) !important;
+  outline-offset: -3px !important;
+}
+
+html.is-lite-performance .result-label,
+html.is-lite-performance .result-label.is-visible,
+html.is-lite-performance .result-label.is-win,
+html.is-lite-performance .result-label.is-lose,
+html.is-lite-performance .result-label.is-draw,
+html.is-lite-performance .result-label.is-double,
+html.is-lite-performance .result-label.is-final {
+  animation: none !important;
+  transition: none !important;
+  text-shadow: none !important;
+}
+
+html.is-lite-performance .hand-result-image,
+html.is-lite-performance .choice-hand-image {
+  filter: none !important;
+}
+
+html.is-lite-performance .mood-badge {
+  text-shadow: none !important;
+  border-width: 2px !important;
+}
+
+@media (max-width: 380px), (max-height: 720px) {
+  .aiko-guide-hud {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  html.is-lite-performance .aiko-guide-hud {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+
+/* ===== Flow/audio/assets polish patch ===== */
+
+.scoreboard {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 5px !important;
+}
+
+.scoreboard span {
+  min-height: 44px !important;
+  padding: 5px 3px 6px !important;
+  font-size: clamp(0.58rem, 2.55vw, 0.82rem) !important;
+}
+
+.scoreboard strong {
+  font-size: clamp(0.82rem, 3.45vw, 1.16rem) !important;
+  letter-spacing: -0.04em !important;
+}
+
+.score-pot strong {
+  font-size: clamp(0.84rem, 3.55vw, 1.22rem) !important;
+}
+
+.aiko-guide-hud {
+  line-height: 1.15 !important;
+}
+
+.aiko-guide-hud span {
+  white-space: nowrap;
+}
+
+.cabinet.is-final-janken .aiko-guide-hud {
+  border-color: rgba(255, 140, 80, 0.9) !important;
+  color: #ffd18c !important;
+}
+
+.character-frame img,
+.scene-character img {
+  display: block;
+  opacity: 1;
+}
+
+html.is-lite-performance .scoreboard {
+  gap: 4px !important;
+}
+
+html.is-lite-performance .scoreboard span {
+  min-height: 40px !important;
+}
+
+html.is-lite-performance .choice.is-selected {
+  animation: none !important;
+}
+
+html.is-lite-performance .hand-card.is-hand-pop-frame::after,
+html.is-lite-performance .hand-card strong.is-hand-pop {
+  animation: none !important;
+}
+
+@media (max-width: 380px) {
+  .scoreboard {
+    gap: 4px !important;
+  }
+
+  .scoreboard span {
+    min-height: 38px !important;
+    padding: 4px 2px 5px !important;
+    font-size: clamp(0.5rem, 2.35vw, 0.68rem) !important;
+  }
+
+  .scoreboard strong {
+    font-size: clamp(0.72rem, 3.05vw, 0.96rem) !important;
+  }
+
+  .aiko-guide-hud {
+    font-size: clamp(0.5rem, 2.2vw, 0.68rem) !important;
   }
 }

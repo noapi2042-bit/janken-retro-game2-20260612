@@ -6,19 +6,12 @@ const hands = {
 
 function characterVariant(prefix, index) {
   const id = String(index).padStart(2, "0");
-  const plain = String(index);
   const paddedBase = `assets/images/character_${prefix}_${id}`;
-  const plainBase = `assets/images/character_${prefix}_${plain}`;
 
+  // 本番では存在する .png を優先し、旧形式 .png.png だけを保険にする。
+  // .webp/.jpg/番号ゼロなし総当たりは、スマホで404連打になりやすいので使わない。
   return [
     `${paddedBase}.png`,
-    `${paddedBase}.webp`,
-    `${paddedBase}.jpg`,
-    `${paddedBase}.jpeg`,
-    `${plainBase}.png`,
-    `${plainBase}.webp`,
-    `${plainBase}.jpg`,
-    `${plainBase}.jpeg`,
     `${paddedBase}.png.png`,
   ];
 }
@@ -98,6 +91,9 @@ const galleryItems = [
 ];
 
 const imageCache = new Map();
+const imageFailCache = new Map();
+let characterRetryTimer = null;
+let sceneCharacterRetryTimer = null;
 let characterRequestId = 0;
 let sceneCharacterRequestId = 0;
 let sceneIllustrationRequestId = 0;
@@ -129,7 +125,7 @@ const CHOICE_BUFFER_MS = 900;
 
 const urlParams = new URLSearchParams(window.location.search);
 const DEBUG_MODE = urlParams.has("debug");
-const ASSET_VERSION = "20260612-mobile-audit-fix2";
+const ASSET_VERSION = "20260613-flow-audio-assets1";
 
 function assetPath(src) {
   if (!src || /^(?:data:|blob:|https?:)/.test(src) || src.includes("?v=")) {
@@ -196,6 +192,7 @@ function detectLowPowerDevice() {
 }
 
 const LOW_POWER_MODE = detectLowPowerDevice();
+const IMAGE_FAIL_CACHE_MS = LOW_POWER_MODE ? 60000 : 15000;
 const TOUCH_DEVICE = (() => {
   try {
     return Number(navigator.maxTouchPoints || 0) > 0 ||
@@ -219,9 +216,9 @@ const CHANCE_DRAW_COUNT = 10;
 const FINAL_DRAW_COUNT = 15;
 const CHANCE_MESSAGES = ["メダル大！", "ねらって！", "あわせる？", "まだいける！"];
 const INTRO_LINES = ["よろしくね！", "じゃんけんしよ♪", "てをえらんでね", "はじめるよ！", "あいこ、できる？"];
-const CHANCE_ENTRY_LINES = ["メダル大！", "ねらって！", "あわせる？", "ここだよ！"];
+const CHANCE_ENTRY_LINES = ["チャンスタイム！", "あいこ成功！", "メダル大！", "ここからチャンス"];
 const DRAW_WARNING_LINES = ["あいこ いいね", "メダルふえた", "まだつづく？"];
-const FINAL_JANKEN_ENTRY_LINES = ["さいごのじゃんけん！", "つぎで きまるよ！", "よく見てね！"];
+const FINAL_JANKEN_ENTRY_LINES = ["さいごのじゃんけん！", "ここからノーヒント", "よく考えてね"];
 const FINAL_JANKEN_IDLE_LINES = ["つぎで きまるよ", "よく見て", "さいごだよ"];
 const FINAL_CONFIRM_LINES = ["それでいい？", "もういちど おして", "きめる？"];
 const PSYCH_EVENT_CHANCE = 0.12;
@@ -234,11 +231,13 @@ const HAND_NAMES = {
   paper: "ぱー",
 };
 
+const RELATIONSHIP_INTENT = "continueAiko";
+
 const MOOD_LABELS = {
   normal: "きもち：よめない",
   draw: "きもち：あわせたい",
   happy: "きもち：あわせたい",
-  smug: "きもち：さそい",
+  smug: "きもち：ためす",
   worried: "きもち：すなお",
   panic: "きもち：あせり",
   excited: "きもち：チャンス",
@@ -259,14 +258,14 @@ const FEELING_LABELS = {
     hint: "同じ手で続く",
   },
   bait: {
-    label: "きもち：さそい",
-    rule: "おすすめはワナ",
-    hint: "すすめた手は危ない",
+    label: "きもち：ためす",
+    rule: "見せた手は外す",
+    hint: "少しだけ試している",
   },
   hide: {
-    label: "きもち：かくす",
-    rule: "かくした手",
-    hint: "かくした手を見る",
+    label: "きもち：ないしょ",
+    rule: "隠した手",
+    hint: "ないしょの手を見る",
   },
   hesitate: {
     label: "きもち：まよい",
@@ -306,50 +305,50 @@ const SCENE_PLAYER_LOSE_LINES = [
 const dialogue = {
   final: {
     idle: FINAL_JANKEN_IDLE_LINES,
-    cpuWin: ["わたしのかち！", "きまったね！", "とったよ！"],
-    cpuLose: ["あなたのかち！", "すごい！", "よまれた…！"],
+    cpuWin: ["きまったね！", "とったよ！", "また続けよ"],
+    cpuLose: ["あなたが読んだね！", "すごい！", "よまれた…！"],
     draw: ["またあいこ！", "まだつづく！", "ぴったりだね"],
     image: "excited",
   },
   even: {
     idle: ["てをえらんで", "なにを出す？", "よく見てね"],
-    cpuWin: ["やった！", "わたしのかち", "メダルもらうね"],
-    cpuLose: ["まけた…", "つよいね", "メダルとられた"],
+    cpuWin: ["とれちゃった", "まだ続けよ", "メダルもらうね"],
+    cpuLose: ["とられた…", "でも楽しいね", "もう一回ね"],
     draw: ["あいこ！", "もういっかい", "ぴったりだね"],
     image: "normal",
   },
   playerLeadSmall: {
     idle: ["つよいね", "まよっちゃう", "つぎはどう？"],
-    cpuWin: ["まだいける", "とれた！", "まけないよ"],
-    cpuLose: ["うう…", "またとられた", "よまれてる？"],
+    cpuWin: ["とれたよ", "まだ続くよ", "ほっとした"],
+    cpuLose: ["あっ…", "また読まれた", "ちゃんと見てるね"],
     draw: ["あいこだね", "まだつづくね", "メダルふえるよ"],
     image: "worried",
   },
   playerLeadBig: {
     idle: ["あせってきた", "よく見てるね", "つぎこそ…"],
-    cpuWin: ["とれた！", "まだおわらない", "ほっとした"],
-    cpuLose: ["まいったな…", "つよすぎるよ", "どうしよう"],
+    cpuWin: ["とれたよ", "まだおわらない", "ほっとした"],
+    cpuLose: ["まいったな…", "よく見てるね", "どうしよう"],
     draw: ["またあいこ", "どきどきするね", "メダル大きいよ"],
     image: "panic",
   },
   cpuLeadSmall: {
     idle: ["いい感じ♪", "つぎもいくよ", "よめるかな？"],
-    cpuWin: ["メダルもらうね", "やった！", "いい手だった"],
-    cpuLose: ["あれ？", "やるね", "まだ平気"],
+    cpuWin: ["メダルもらうね", "まだ続けよ", "いい手だった"],
+    cpuLose: ["あれ？", "やるね", "まだ続けたい"],
     draw: ["あいこ！", "おしいね", "まだつづく？"],
     image: "happy",
   },
   cpuLeadBig: {
     idle: ["よゆうかも", "どうする？", "あててみて"],
-    cpuWin: ["またとった♪", "調子いいよ", "ふふっ"],
+    cpuWin: ["またとれた♪", "読めるかな？", "ふふっ"],
     cpuLose: ["えっ？", "油断した", "びっくりした"],
     draw: ["あいこだね", "ねばるね", "たのしいね"],
     image: "smug",
   },
   chance: {
     idle: CHANCE_MESSAGES,
-    cpuWin: ["メダルもらうね", "とったよ！", "チャンス成功"],
-    cpuLose: ["とられた！", "うまいね", "やられた…"],
+    cpuWin: ["メダルもらうね", "まだ続くよ", "チャンス中だよ"],
+    cpuLose: ["とられた！", "うまいね", "よく読んだね"],
     draw: ["メダルふえた！", "まだまだ！", "あいこ！"],
     image: "excited",
   },
@@ -571,20 +570,22 @@ function getTrainingForcedFeeling() {
 
   if (stage === "basic") {
     // チャンス勝利までの練習。
-    // 同じ手 → そのまま → まよい → さそい、の順で自然に覚える。
+    // 同じ手 → そのまま → まよい → ためす、の順で自然に覚える。
     const sequence = [
       "match",
       "honest",
       "match",
       "hesitate",
+      "match",
       "bait",
-      "match",
       "honest",
-      "hesitate",
       "match",
+      "hesitate",
       "bait",
       "match",
       "hide",
+      "match",
+      "hesitate",
     ];
 
     return sequence[draw] || null;
@@ -603,7 +604,9 @@ function getTrainingForcedFeeling() {
       "panic",
       "match",
       "bait",
+      "honest",
       "match",
+      "hide",
     ];
 
     return sequence[draw] || null;
@@ -727,6 +730,10 @@ const medalRecordHud = document.querySelector("#medalRecordHud");
 const currentMedalRecord = document.querySelector("#currentMedalRecord");
 const bestMedalRecord = document.querySelector("#bestMedalRecord");
 const newMedalRecordBadge = document.querySelector("#newMedalRecordBadge");
+const aikoGuideHud = document.querySelector("#aikoGuideHud");
+const phaseLabel = document.querySelector("#phaseLabel");
+const nextChanceLabel = document.querySelector("#nextChanceLabel");
+const nextFinalLabel = document.querySelector("#nextFinalLabel");
 const characterFrame = document.querySelector(".character-frame");
 const characterImage = document.querySelector("#characterImage");
 const characterFallback = document.querySelector("#characterFallback");
@@ -965,18 +972,12 @@ const AudioManager = (() => {
         normalBgm = createBgm("normal");
       }
 
+      // スマホでは起動時に全BGMを読むと重いので、通常BGMだけ作る。
+      // チャンス・ファイナル・TRUE ENDは必要になった瞬間に lazy 作成する。
       if (!LOW_POWER_MODE) {
-        if (!chanceBgm) {
-          chanceBgm = createBgm("chance");
-        }
-
-        if (!finalBgm) {
-          finalBgm = createBgm("final");
-        }
-
-        if (!trueEndBgm) {
-          trueEndBgm = createBgm("trueEnd");
-        }
+        ensureBgm("chance");
+        ensureBgm("final");
+        ensureBgm("trueEnd");
       }
 
       if (!context) {
@@ -1030,6 +1031,43 @@ const AudioManager = (() => {
       { once: true }
     );
     return audio;
+  }
+
+  function ensureBgm(mode) {
+    if (mode === "trueEnd") {
+      if (trueEndBgmFailed) {
+        return ensureBgm("final");
+      }
+      if (!trueEndBgm) {
+        trueEndBgm = createBgm("trueEnd");
+      }
+      return trueEndBgm;
+    }
+
+    if (mode === "final") {
+      if (finalBgmFailed) {
+        return ensureBgm("chance");
+      }
+      if (!finalBgm) {
+        finalBgm = createBgm("final");
+      }
+      return finalBgm;
+    }
+
+    if (mode === "chance") {
+      if (chanceBgmFailed) {
+        return ensureBgm("normal");
+      }
+      if (!chanceBgm) {
+        chanceBgm = createBgm("chance");
+      }
+      return chanceBgm;
+    }
+
+    if (!normalBgm) {
+      normalBgm = createBgm("normal");
+    }
+    return normalBgm;
   }
 
   function createCutinSfx() {
@@ -1128,23 +1166,7 @@ const AudioManager = (() => {
   }
 
   function bgmForMode(mode) {
-    if (LOW_POWER_MODE && mode !== "normal") {
-      return normalBgm;
-    }
-
-    if (mode === "trueEnd") {
-      return trueEndBgmFailed ? bgmForMode("final") : trueEndBgm;
-    }
-
-    if (mode === "final") {
-      return finalBgmFailed ? bgmForMode("chance") : finalBgm;
-    }
-
-    if (mode === "chance") {
-      return chanceBgmFailed ? normalBgm : chanceBgm;
-    }
-
-    return normalBgm;
+    return ensureBgm(normalizeBgmMode(mode));
   }
 
   function resumeContext() {
@@ -1205,6 +1227,11 @@ const AudioManager = (() => {
 
       currentBgmMode = normalizeBgmMode(mode);
       bgm.volume = bgmVolumes[currentBgmMode];
+      try {
+        bgm.load();
+      } catch (error) {
+        // load is optional.
+      }
       bgm.play().catch(() => {
         if (currentBgmMode === "trueEnd") {
           console.warn("True End BGM not found: assets/sounds/bgm_true_end.mp3");
@@ -1595,9 +1622,9 @@ function showFinalChoiceConfirm(hand) {
   setCharacter("excited");
   triggerCinematicCutIn("final");
   AudioManager.playSound("select");
-  showMessage(`${handName(hand)}でいく？ ${randomLine(FINAL_CONFIRM_LINES)}`, "is-result is-final-entry is-final-confirm", {
+  showMessage(`${handName(hand)}で決める？\nもう一度押すと勝負`, "is-result is-final-entry is-final-confirm", {
     typewriter: true,
-    maxDuration: 620,
+    maxDuration: 780,
   });
 }
 
@@ -2356,6 +2383,78 @@ function scoreStars(score) {
   return "★".repeat(filled) + "☆".repeat(3 - filled);
 }
 
+function phaseTextForHud() {
+  const progress = getアルバムProgress();
+
+  if (progress.trueEndSeen) {
+    return "スコア";
+  }
+
+  if (state.finalJanken || state.draw >= getFinalDrawCount()) {
+    return "さいご";
+  }
+
+  if (state.chance || state.draw >= getChanceDrawCount()) {
+    return "チャンス";
+  }
+
+  if (isGalleryTrainingMode(progress)) {
+    return "練習";
+  }
+
+  return isReadModeUnlocked() ? "読み" : "ふつう";
+}
+
+function updateAikoGuideHud() {
+  if (!aikoGuideHud) {
+    return;
+  }
+
+  const draw = Math.max(0, state.draw || 0);
+  const chanceCount = getChanceDrawCount();
+  const finalCount = getFinalDrawCount();
+  const chanceRemain = Math.max(0, chanceCount - draw);
+  const finalRemain = Math.max(0, finalCount - draw);
+  const progress = getアルバムProgress();
+  const phaseText = phaseTextForHud();
+
+  if (phaseLabel) {
+    phaseLabel.textContent = `いま：${phaseText}`;
+  }
+
+  if (!progress.normalWin && !progress.trueEndSeen) {
+    if (nextChanceLabel) {
+      nextChanceLabel.textContent = `目標：30まいで勝ち`;
+    }
+    if (nextFinalLabel) {
+      nextFinalLabel.textContent = `勝つとメダルをもらう`;
+    }
+  } else if (progress.trueEndSeen) {
+    if (nextChanceLabel) {
+      nextChanceLabel.textContent = `あいこ ${formatScoreValue(draw)}回`;
+    }
+    if (nextFinalLabel) {
+      nextFinalLabel.textContent = "どこまで続く？";
+    }
+  } else {
+    if (nextChanceLabel) {
+      nextChanceLabel.textContent = state.chance || draw >= chanceCount
+        ? "チャンス中"
+        : `チャンスまで あと${chanceRemain}`;
+    }
+
+    if (nextFinalLabel) {
+      nextFinalLabel.textContent = state.finalJanken || draw >= finalCount
+        ? "さいごはノーヒント"
+        : `さいごまで あと${finalRemain}`;
+    }
+  }
+
+  aikoGuideHud.classList.toggle("is-chance", state.chance && !state.finalJanken);
+  aikoGuideHud.classList.toggle("is-final", state.finalJanken);
+  aikoGuideHud.classList.toggle("is-score-attack", progress.trueEndSeen === true);
+}
+
 function updateScore() {
   const previousPotText = potCount?.textContent;
   winCount.textContent = formatScoreValue(state.win);
@@ -2373,25 +2472,38 @@ function updateScore() {
     }
   }
   updateMedalRecordHud();
+  updateAikoGuideHud();
 }
 
 function setChanceMode(enabled) {
   state.chance = enabled;
   cabinet.classList.toggle("is-chance", enabled);
 
+  if (enabled) {
+    AudioManager.playSound("chance");
+  }
+
   if (!enabled) {
     stopChanceMessages();
   }
+
+  updateAikoGuideHud();
 }
 
 function setFinalJankenMode(enabled) {
   state.finalJanken = enabled;
   cabinet.classList.toggle("is-final-janken", enabled);
 
+  if (enabled) {
+    AudioManager.playSound("chance");
+  }
+
   if (!enabled) {
     state.finalConfirmHand = null;
     cabinet.classList.remove("is-final-confirm");
   }
+
+  updateAikoGuideHud();
 }
 
 function setStageMood(mood) {
@@ -2489,7 +2601,8 @@ function getDrawWarningCount() {
 
 function getChanceDrawCount() {
   if (isGalleryTrainingMode()) {
-    return getGalleryTrainingStage() === "basic" ? 5 : 4;
+    const stage = getGalleryTrainingStage();
+    return stage === "basic" ? 7 : 5;
   }
 
   if (isScoreAttackMode()) {
@@ -2501,8 +2614,9 @@ function getChanceDrawCount() {
 
 function getFinalDrawCount() {
   if (isGalleryTrainingMode()) {
-    // chanceWin をまだ取っていない時は、すぐ final に行かず、チャンス勝利を学びやすくする。
-    return getGalleryTrainingStage() === "basic" ? 12 : 9;
+    const stage = getGalleryTrainingStage();
+    // チュートリアル中は少し長めにして、読み方を覚える時間を作る。
+    return stage === "basic" ? 14 : 12;
   }
 
   if (isScoreAttackMode()) {
@@ -2546,7 +2660,7 @@ function routeHintLinesForCurrentTarget() {
   }
 
   if (targetRoute === "finalWin" || phase === "final" || phase === "near") {
-    return ["まよいは\nあとが本音", "さそいは\nおすすめがワナ", "よく見れば\nまだ続くよ", "最後まで\nあわせられる？"];
+    return ["まよいは\nあとが本音", "ためすは\n見せた手を外す", "よく見れば\nまだ続くよ", "最後まで\nあわせられる？"];
   }
 
   if (targetRoute === "chanceWin" || phase === "aware" || phase === "read") {
@@ -2771,13 +2885,14 @@ function formatDebugAnswer(answer = state.debugAnswer) {
   const winName = handName(answer.winHand);
   const loseName = handName(answer.loseHand);
   const feelingText = answer.moodLabel.replace("きもち：", "");
-  const ruleText = answer.ruleText || (answer.honest ? "ことばどおり" : "ワナ");
+  const ruleText = answer.ruleText || (answer.honest ? "ことばどおり" : "見せた手を外す");
 
   return [
     "こたえ",
     `セリフ：${line}`,
     `きもち：${feelingText}`,
     `読み方：${ruleText}`,
+    `本心：あいこを続けたい`,
     `ことばの手：${wordName}`,
     `あいて：${cpuName}`,
     `あいこ：${cpuName}`,
@@ -2834,53 +2949,67 @@ function lineTemplatesForCue(cue) {
   const word = handName(cue.wordHand);
   const cpu = handName(cue.cpuHand);
 
-  // セリフは増やしすぎない。
-  // プレイヤーが「型」を覚えて、少し考えれば読めるようにする。
+  // 本心は「勝負で終わり」より「もう少し続けたい」。
+  // ためす・ないしょも、悪意ではなく照れや試し行動として読ませる。
   if (cue.feeling === "match") {
     return [
-      `${cpu}で\nあいこにしよ`,
-      `${cpu}で\n待ってるね`,
+      `${cpu}で
+あいこにしよ`,
+      `${cpu}で
+待ってるね`,
     ];
   }
 
   if (cue.feeling === "bait") {
     return [
-      `${word}が\nよさそうだよ`,
-      `${word}なら\n勝てるよ`,
+      `${word}に
+見えるかな？`,
+      `${word}って
+思った？`,
     ];
   }
 
   if (cue.feeling === "hide") {
     return [
-      `かくしてるのは\n${cpu}`,
-      `${cpu}は\nないしょだよ`,
+      `ないしょは
+${cpu}だよ`,
+      `${cpu}だけ
+小さく言うね`,
     ];
   }
 
   if (cue.feeling === "hesitate") {
     return [
-      `${word}かな…\nやっぱ${cpu}`,
-      `${word}…\nいや${cpu}`,
+      `${word}かな…
+やっぱ${cpu}`,
+      `${word}…
+ううん${cpu}`,
     ];
   }
 
   if (cue.feeling === "panic") {
     return [
-      `あっ…\n${cpu}って言った`,
-      `ほんとは\n${cpu}だよ`,
+      `あっ…
+${cpu}って言っちゃった`,
+      `ほんとは
+${cpu}だよ`,
     ];
   }
 
   if (cue.feeling === "trueEnd") {
     return [
-      `${cpu}で\nあいこにしよ`,
-      `${cpu}で\n待ってるね`,
+      `${cpu}で
+あいこにしよ`,
+      `${cpu}で
+待ってるね`,
     ];
   }
 
   return [
-    `つぎは\n${cpu}だよ`,
-    `わたしは\n${cpu}だよ`,
+    `つぎは
+${cpu}だよ`,
+    `わたしは
+${cpu}を出すね`,
   ];
 }
 
@@ -3019,13 +3148,13 @@ function createReadCue() {
     cpuHand = handThatBeats(wordHand) || randomCpuHand();
     imageMood = "smug";
     honest = false;
-    ruleText = "おすすめはワナ";
+    ruleText = "見せた手は外す";
   } else if (feeling === "hide") {
     cpuHand = randomCpuHand();
     wordHand = cpuHand;
     imageMood = "smug";
     honest = false;
-    ruleText = "かくした手";
+    ruleText = "隠した手";
   } else if (feeling === "hesitate") {
     wordHand = randomCpuHand();
     cpuHand = anotherHand(wordHand);
@@ -3044,6 +3173,7 @@ function createReadCue() {
 
   const info = feelingInfo(feeling);
   const cue = {
+    relationshipIntent: RELATIONSHIP_INTENT,
     type: feeling === "match" || feeling === "trueEnd" ? "request" : "predict",
     feeling,
     feelingLabel: info.label,
@@ -3265,7 +3395,7 @@ async function showIntroThenReady() {
   setButtonsEnabled(false);
   resetRoundView();
 
-  showMessage("30まいで かち！\nメダルを とろう");
+  showMessage("まずは30まい。\n勝ってメダルを取ろう");
   await wait(900);
 
   if (flowId !== state.flowId || !state.started || state.ended) {
@@ -3338,8 +3468,8 @@ async function showFinalJankenEntry() {
     return;
   }
 
-  showMessage("つぎで きまるよ", "is-result is-final-entry");
-  await wait(650);
+  showMessage("ここからノーヒント", "is-result is-final-entry");
+  await wait(720);
 
   if (!state.started || state.ended || !state.finalJanken) {
     return;
@@ -3473,6 +3603,13 @@ function preloadImage(src) {
   }
 
   const resolvedSrc = assetPath(src);
+  const failedUntil = imageFailCache.get(resolvedSrc) || 0;
+  if (failedUntil && failedUntil > Date.now()) {
+    return Promise.resolve(null);
+  }
+  if (failedUntil) {
+    imageFailCache.delete(resolvedSrc);
+  }
 
   if (imageCache.has(resolvedSrc)) {
     return imageCache.get(resolvedSrc);
@@ -3503,6 +3640,7 @@ function preloadImage(src) {
     img.onerror = () => {
       console.warn("Image not found:", resolvedSrc);
       imageCache.delete(resolvedSrc);
+      imageFailCache.set(resolvedSrc, Date.now() + IMAGE_FAIL_CACHE_MS);
       resolve(null);
     };
 
@@ -3666,10 +3804,7 @@ function setCharacter(mood, feeling = null) {
       return;
     }
 
-    prepareRuntimeImage(characterImage, "high");
-    characterImage.src = loaded.src;
-    characterImage.hidden = false;
-    characterFallback.hidden = true;
+    showLoadedCharacterImage(characterImage, characterFallback, loaded.src, "high");
   });
 }
 
@@ -3690,39 +3825,55 @@ function setSceneCharacter(mood) {
       return;
     }
 
-    prepareRuntimeImage(sceneCharacterImage, "low");
-    sceneCharacterImage.src = loaded.src;
-    sceneCharacterImage.hidden = false;
-    sceneCharacterFallback.hidden = true;
+    showLoadedCharacterImage(sceneCharacterImage, sceneCharacterFallback, loaded.src, "low");
   });
 }
 
+function commonCharacterFallbackSources() {
+  return [
+    "assets/images/character_draw_01.png",
+    "assets/images/character_normal_01.png",
+    "assets/images/character_happy_01.png",
+    "assets/images/character_draw_01.png.png",
+    "assets/images/character_normal_01.png.png",
+  ];
+}
+
+function showLoadedCharacterImage(imgElement, fallbackElement, src, priority = "high") {
+  prepareRuntimeImage(imgElement, priority);
+  imgElement.src = src;
+  imgElement.hidden = false;
+  fallbackElement.hidden = true;
+}
+
 function useFallbackCharacter() {
-  characterFrame.dataset.mood = "fallback";
-  characterImage.hidden = true;
-  characterFallback.hidden = false;
-  retryVisibleCharactersSoon();
+  // 画像名の一部が欠けている場合でも、共通の立ち絵だけは出す。
+  loadFirstAvailableSource(commonCharacterFallbackSources()).then((loaded) => {
+    if (loaded) {
+      showLoadedCharacterImage(characterImage, characterFallback, loaded.src, "high");
+      return;
+    }
+
+    characterFrame.dataset.mood = "fallback";
+    characterImage.hidden = true;
+    characterFallback.hidden = false;
+  });
 }
 
 function useFallbackSceneCharacter() {
-  sceneCharacterImage.hidden = true;
-  sceneCharacterFallback.hidden = false;
-  retryVisibleCharactersSoon();
+  loadFirstAvailableSource(commonCharacterFallbackSources()).then((loaded) => {
+    if (loaded) {
+      showLoadedCharacterImage(sceneCharacterImage, sceneCharacterFallback, loaded.src, "low");
+      return;
+    }
+
+    sceneCharacterImage.hidden = true;
+    sceneCharacterFallback.hidden = false;
+  });
 }
 
-function retryVisibleCharactersSoon(delay = 700) {
-  window.setTimeout(() => {
-    if (state.started && !state.ended && characterImage && characterImage.hidden && !characterFallback.hidden) {
-      const mood = characterFrame?.dataset?.mood && characterFrame.dataset.mood !== "fallback"
-        ? characterFrame.dataset.mood
-        : "normal";
-      setCharacter(mood);
-    }
-
-    if (sceneOverlay && !sceneOverlay.hidden && sceneCharacterImage && sceneCharacterImage.hidden && !sceneCharacterFallback.hidden) {
-      setSceneCharacter("normal");
-    }
-  }, delay);
+function retryVisibleCharactersSoon() {
+  // 旧版の短周期リトライは、画像欠け時にスマホで負荷になるため停止。
 }
 
 ["visibilitychange", "focus", "online", "pageshow"].forEach((eventName) => {
@@ -4087,7 +4238,7 @@ function endingLinesForRoute(routeId) {
     return [
       "チャンスタイムまで\n見つけたんだね。",
       "次は少しだけ難しくなるよ。",
-      "まよい＝あとが本音。\nさそい＝おすすめはワナ。",
+      "まよい＝あとが本音。\nためす＝見せた手を外す。",
       getNextGoalHintLine(routeId),
     ];
   }
@@ -4624,16 +4775,16 @@ function addRoundScore(result) {
     scoreChange.finalResolved = true;
     scoreChange.finalResult = result;
     if (result === "win") {
-      state.win = MATCH_POINT;
+      state.win += payout;
     } else if (result === "lose") {
-      state.lose = MATCH_POINT;
+      state.lose += payout;
     }
     state.pot = BASE_メダル;
     state.draw = 0;
     return scoreChange;
   }
 
-  state[result] = Math.min(MATCH_POINT, state[result] + payout);
+  state[result] += payout;
   state.pot = BASE_メダル;
   state.draw = 0;
   state.drawWarningShown = false;
