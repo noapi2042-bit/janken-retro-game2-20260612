@@ -201,6 +201,15 @@ function scoreCharacterEntry(entry, context = null) {
     } else {
       score -= 1.8;
     }
+  } else if (feeling === "mirror") {
+    if (shownHand === "neutral") {
+      score += 7.0;
+    } else {
+      score += 2.4;
+    }
+    if (meta.vibe === "welcome" || meta.vibe === "reach" || meta.vibe === "soft") {
+      score += 2.0;
+    }
   } else if (feeling === "hesitate") {
     if (shownHand === "neutral") {
       score += 6.2;
@@ -380,7 +389,7 @@ const CHOICE_BUFFER_MS = 900;
 
 const urlParams = new URLSearchParams(window.location.search);
 const DEBUG_MODE = urlParams.has("debug");
-const ASSET_VERSION = "20260613-presentation-polish1";
+const ASSET_VERSION = "20260613-aiko-communication1";
 
 function assetPath(src) {
   if (!src || /^(?:data:|blob:|https?:)/.test(src) || src.includes("?v=")) {
@@ -514,8 +523,13 @@ const FEELING_LABELS = {
   },
   bait: {
     label: "きもち：ためす",
-    rule: "見せた手は外す",
-    hint: "少しだけ試している",
+    rule: "見せ手を外す",
+    hint: "見せた手以外なら合わせる",
+  },
+  mirror: {
+    label: "きもち：みてる",
+    rule: "あなたに合わせる",
+    hint: "先に出してみて",
   },
   hide: {
     label: "きもち：ないしょ",
@@ -833,7 +847,7 @@ function getTrainingForcedFeeling() {
       "hesitate",
       "match",
       "bait",
-      "honest",
+      "mirror",
       "match",
       "hesitate",
       "bait",
@@ -857,7 +871,7 @@ function getTrainingForcedFeeling() {
       "hide",
       "hesitate",
       "panic",
-      "match",
+      "mirror",
       "bait",
       "honest",
       "match",
@@ -877,7 +891,7 @@ function getTrainingForcedFeeling() {
       "match",
       "hide",
       "panic",
-      "match",
+      "mirror",
     ];
 
     return sequence[draw] || null;
@@ -3109,11 +3123,14 @@ function buildDebugAnswerFromPsychEvent(event, line = "") {
     return null;
   }
 
-  const cpuHand = event.cpuHand || event.predictedHand || event.requestedHand;
-  const wordHand = event.wordHand || event.saidHand || event.predictedHand || event.requestedHand || cpuHand;
+  const dynamicMode = event.dynamicMode || "";
+  const avoidHand = event.avoidHand || event.dynamicAvoidHand || null;
+  const resolvedCpuHand = event.resolvedCpuHand || null;
+  const cpuHand = resolvedCpuHand || event.cpuHand || event.predictedHand || event.requestedHand || null;
+  const wordHand = event.wordHand || event.saidHand || event.predictedHand || event.requestedHand || cpuHand || avoidHand;
   const hintHand = event.hintHand || wordHand;
-  const winHand = handThatBeats(cpuHand);
-  const loseHand = handThatLosesTo(cpuHand);
+  const winHand = cpuHand ? handThatBeats(cpuHand) : null;
+  const loseHand = cpuHand ? handThatLosesTo(cpuHand) : null;
   const feeling = event.feeling || "";
   const feelingInfo = FEELING_LABELS[feeling] || null;
 
@@ -3125,6 +3142,9 @@ function buildDebugAnswerFromPsychEvent(event, line = "") {
     cpuHand,
     winHand,
     loseHand,
+    dynamicMode,
+    avoidHand,
+    resolvedPlayerHand: event.resolvedPlayerHand || null,
     mood: event.mood || event.imageMood || "",
     moodLabel: event.feelingLabel || feelingInfo?.label || MOOD_LABELS[event.mood] || "きもち：？",
     feeling,
@@ -3162,7 +3182,7 @@ function setDebugAnswerNoHint(reason = "") {
       reason || "このセリフは、手を読むヒントではありません。",
       "",
       "ヒント時は",
-      "セリフ＋きもち＝あいての手",
+      "セリフ＋きもち＝合わせ方",
     ].filter(Boolean).join("\n"),
   };
   updateDebugAnswerPanel();
@@ -3175,7 +3195,7 @@ function formatDebugAnswer(answer = state.debugAnswer) {
       "いまはヒントなし",
       "",
       "ヒント時は",
-      "セリフ＋きもち＝あいての手",
+      "セリフ＋きもち＝合わせ方",
     ].join("\n");
   }
 
@@ -3188,8 +3208,37 @@ function formatDebugAnswer(answer = state.debugAnswer) {
   const cpuName = handName(answer.cpuHand);
   const winName = handName(answer.winHand);
   const loseName = handName(answer.loseHand);
+  const avoidName = handName(answer.avoidHand);
+  const playerName = handName(answer.resolvedPlayerHand);
   const feelingText = answer.moodLabel.replace("きもち：", "");
-  const ruleText = answer.ruleText || (answer.honest ? "ことばどおり" : "見せた手を外す");
+  const ruleText = answer.ruleText || (answer.honest ? "ことばどおり" : "見せ手を外す");
+
+  if (answer.dynamicMode === "mirror") {
+    return [
+      "こたえ",
+      `セリフ：${line}`,
+      `きもち：${feelingText}`,
+      `読み方：${ruleText}`,
+      "本心：あなたに合わせたい",
+      answer.resolvedPlayerHand ? `あなた：${playerName}` : "あなた：先に出す",
+      answer.resolvedPlayerHand ? `あいて：${playerName}` : "あいて：あなたと同じ",
+      "あいこ：どの手でもOK",
+    ].join("\n");
+  }
+
+  if (answer.dynamicMode === "avoid") {
+    return [
+      "こたえ",
+      `セリフ：${line}`,
+      `きもち：${feelingText}`,
+      `読み方：${ruleText}`,
+      "本心：引っかからなければ合わせる",
+      `見せ手：${avoidName}`,
+      `成功：${avoidName}以外ならあいこ`,
+      answer.resolvedPlayerHand ? `あなた：${playerName}` : "あなた：まだ未選択",
+      answer.cpuHand ? `あいて：${cpuName}` : "あいて：選んだ手に合わせる",
+    ].join("\n");
+  }
 
   return [
     "こたえ",
@@ -3262,6 +3311,9 @@ function markReadCueDifficulty(cue) {
   if (isDifficultFeeling(cue.feeling)) {
     cabinet.classList.add("is-cue-caution");
     AudioManager.playSound(cue.feeling === "hesitate" ? "focus" : "caution");
+  } else if (cue.feeling === "mirror") {
+    cabinet.classList.add("is-cue-focus");
+    AudioManager.playSound("focus");
   } else if (cue.feeling === "match" && state.draw >= getChanceDrawCount()) {
     cabinet.classList.add("is-cue-focus");
   }
@@ -3285,10 +3337,16 @@ function lineTemplatesForCue(cue) {
 
   if (cue.feeling === "bait") {
     return [
-      `${word}っぽく
-見えるかな？`,
-      `${word}に
-見せてみるね`,
+      `${word}っぽく\n見えるかな？`,
+      `${word}に\n見せてみるね`,
+    ];
+  }
+
+  if (cue.feeling === "mirror") {
+    return [
+      `先に\n出してみて`,
+      `今度は\nわたしが見るね`,
+      `あなたの手に\n合わせるね`,
     ];
   }
 
@@ -3356,14 +3414,16 @@ function createReadCue() {
             { value: "match", weight: 38 },
             { value: "honest", weight: 18 },
             { value: "hesitate", weight: 24 },
-            { value: "bait", weight: 16 },
+            { value: "bait", weight: 14 },
+            { value: "mirror", weight: 10 },
             { value: "hide", weight: 4 },
           ]
         : [
             { value: "match", weight: 44 },
             { value: "honest", weight: 28 },
-            { value: "hesitate", weight: 20 },
-            { value: "bait", weight: 8 },
+            { value: "hesitate", weight: 18 },
+            { value: "mirror", weight: 8 },
+            { value: "bait", weight: 6 },
           ];
     } else if (stage === "advanced") {
       // ギャラリー回収の3回目。スコアアタックより少しシビアにして、型を身につける。
@@ -3371,7 +3431,8 @@ function createReadCue() {
         { value: "match", weight: 32 },
         { value: "honest", weight: 16 },
         { value: "hesitate", weight: 24 },
-        { value: "bait", weight: 18 },
+        { value: "bait", weight: 16 },
+        { value: "mirror", weight: 8 },
         { value: "hide", weight: 7 },
         { value: "panic", weight: 3 },
       ];
@@ -3381,7 +3442,8 @@ function createReadCue() {
         { value: "match", weight: 34 },
         { value: "honest", weight: 20 },
         { value: "hesitate", weight: 20 },
-        { value: "bait", weight: 18 },
+        { value: "bait", weight: 16 },
+        { value: "mirror", weight: 10 },
         { value: "hide", weight: 6 },
         { value: "panic", weight: 2 },
       ];
@@ -3391,14 +3453,16 @@ function createReadCue() {
     pool = [
       { value: "trueEnd", weight: 54 },
       { value: "match", weight: 30 },
-      { value: "panic", weight: 10 },
+      { value: "mirror", weight: 8 },
+      { value: "panic", weight: 8 },
       { value: "honest", weight: 6 },
     ];
   } else if (draw >= getFinalDrawCount()) {
     pool = [
       { value: "match", weight: 34 },
       { value: "hesitate", weight: 24 },
-      { value: "bait", weight: 20 },
+      { value: "bait", weight: 18 },
+      { value: "mirror", weight: 8 },
       { value: "panic", weight: 14 },
       { value: "hide", weight: 8 },
     ];
@@ -3406,8 +3470,9 @@ function createReadCue() {
     pool = [
       { value: "match", weight: 42 },
       { value: "honest", weight: 22 },
-      { value: "hesitate", weight: 20 },
-      { value: "bait", weight: 16 },
+      { value: "hesitate", weight: 18 },
+      { value: "mirror", weight: 8 },
+      { value: "bait", weight: 14 },
     ];
   } else if (draw >= getDrawWarningCount()) {
     pool = [
@@ -3462,16 +3527,26 @@ function createReadCue() {
   let imageMood = "worried";
   let honest = true;
   let ruleText = "そのまま";
+  let dynamicMode = "";
+  let avoidHand = null;
 
   if (feeling === "match") {
     imageMood = draw >= getChanceDrawCount() ? "draw" : "happy";
     ruleText = "同じ手";
   } else if (feeling === "bait") {
     wordHand = randomCpuHand();
-    cpuHand = handThatBeats(wordHand) || randomCpuHand();
+    cpuHand = null;
+    avoidHand = wordHand;
+    dynamicMode = "avoid";
     imageMood = "smug";
     honest = false;
-    ruleText = "見せた手は外す";
+    ruleText = "見せ手を外す";
+  } else if (feeling === "mirror") {
+    wordHand = null;
+    cpuHand = null;
+    dynamicMode = "mirror";
+    imageMood = draw >= getChanceDrawCount() ? "draw" : "happy";
+    ruleText = "あなたに合わせる";
   } else if (feeling === "hide") {
     cpuHand = randomCpuHand();
     wordHand = cpuHand;
@@ -3497,16 +3572,23 @@ function createReadCue() {
   const info = feelingInfo(feeling);
   const cue = {
     relationshipIntent: RELATIONSHIP_INTENT,
-    type: feeling === "match" || feeling === "trueEnd" ? "request" : "predict",
+    type: feeling === "match" || feeling === "trueEnd" ? "request" : dynamicMode || "predict",
     feeling,
     feelingLabel: info.label,
     ruleText,
-    formulaText: `セリフ＋${info.label.replace("きもち：", "")}＝${handName(cpuHand)}`,
+    formulaText: dynamicMode === "mirror"
+      ? "あなたの手＝あいての手"
+      : dynamicMode === "avoid"
+        ? `${handName(avoidHand)}以外＝あいてが合わせる`
+        : `セリフ＋${info.label.replace("きもち：", "")}＝${handName(cpuHand)}`,
     cpuHand,
     wordHand,
     saidHand: wordHand,
-    predictedHand: feeling === "bait" ? wordHand : cpuHand,
+    predictedHand: dynamicMode === "avoid" ? wordHand : cpuHand,
     requestedHand: cpuHand,
+    avoidHand,
+    dynamicAvoidHand: avoidHand,
+    dynamicMode,
     imageMood,
     mood: imageMood,
     honest,
@@ -4828,7 +4910,27 @@ function chooseCpuHand(player) {
 
   if (state.psychEvent) {
     const event = state.psychEvent;
-    const cpuHand = event.cpuHand;
+    let cpuHand = event.cpuHand;
+
+    if (event.dynamicMode === "mirror") {
+      cpuHand = player;
+      event.resolvedPlayerHand = player;
+      event.resolvedCpuHand = cpuHand;
+    } else if (event.dynamicMode === "avoid") {
+      const avoidHand = event.avoidHand || event.dynamicAvoidHand || event.wordHand;
+      event.resolvedPlayerHand = player;
+
+      if (player && player !== avoidHand) {
+        // 見せ手を外せたら、相手が合わせてくれる。
+        cpuHand = player;
+      } else {
+        // 見せ手に引っかかった時だけ、ちゃんと失敗としてメダルを取られる。
+        cpuHand = handThatBeats(player) || randomCpuHand();
+      }
+
+      event.resolvedCpuHand = cpuHand;
+    }
+
     // このラウンドで使ったヒントの答えとして固定する。
     // 次の入力待ちに入った時点で showNextInputPrompt() が新しい状態に更新する。
     state.debugAnswer = buildDebugAnswerFromPsychEvent(event, event.line || state.debugAnswer?.line || "");

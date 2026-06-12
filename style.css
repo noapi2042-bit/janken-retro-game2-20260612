@@ -5361,3 +5361,19 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 .cabinet.player-draw .character-frame img {
   height: var(--char-height) !important;
 }
+
+
+/* ===== 20260613-aiko-communication1: aiko communication rules ===== */
+.cabinet.is-cue-focus .message {
+  border-color: rgba(170, 255, 220, 0.96) !important;
+  color: #eafff7 !important;
+}
+
+.mood-badge[data-mood="mirror"] {
+  background: linear-gradient(#d8fff2, #7ee8cf) !important;
+  color: #10231d !important;
+}
+
+.debug-answer-hud {
+  white-space: pre-wrap !important;
+}
