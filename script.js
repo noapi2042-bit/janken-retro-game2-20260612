@@ -212,10 +212,13 @@ function scoreCharacterEntry(entry, context = null) {
     }
   } else if (feeling === "hesitate") {
     if (shownHand === "neutral") {
-      score += 6.2;
+      score += 7.0;
+    }
+    if (meta.vibe === "shy" || meta.vibe === "uneasy" || meta.vibe === "thinking") {
+      score += 2.2;
     }
     if (shownHand === fakeHand || shownHand === targetHand) {
-      score += 2.1;
+      score += 1.0;
     }
   }
 
@@ -382,6 +385,8 @@ let lastChoiceActivationAt = 0;
 let pendingChoiceHand = null;
 let pendingChoiceAt = 0;
 let pendingChoiceTimer = null;
+let psychCueMessageTimer = null;
+let lastSpecialCueSignalAt = 0;
 
 const CHOICE_POINTER_ACTIVATION_SUPPRESS_MS = 420;
 const CHOICE_ACTIVATION_GUARD_MS = 120;
@@ -389,7 +394,7 @@ const CHOICE_BUFFER_MS = 900;
 
 const urlParams = new URLSearchParams(window.location.search);
 const DEBUG_MODE = urlParams.has("debug");
-const ASSET_VERSION = "20260613-ui-clean-strip1";
+const ASSET_VERSION = "20260613-panic-complete-run1";
 
 function assetPath(src) {
   if (!src || /^(?:data:|blob:|https?:)/.test(src) || src.includes("?v=")) {
@@ -478,6 +483,7 @@ const CONTINUE_SECONDS = 10;
 const DRAW_WARNING_COUNT = 5;
 const CHANCE_DRAW_COUNT = 10;
 const FINAL_DRAW_COUNT = 15;
+const POST_TRUE_COMPLETE_DRAW_COUNT = 100;
 const CHANCE_MESSAGES = ["メダル大！", "ねらって！", "あわせる？", "まだいける！"];
 const INTRO_LINES = ["よろしくね！", "じゃんけんしよ♪", "てをえらんでね", "はじめるよ！", "あいこ、できる？"];
 const CHANCE_ENTRY_LINES = ["チャンスタイム！", "あいこ成功！", "メダル大！", "ここからチャンス"];
@@ -538,13 +544,13 @@ const FEELING_LABELS = {
   },
   hesitate: {
     label: "きもち：まよい",
-    rule: "あとが本音",
-    hint: "あとに言った手を見る",
+    rule: "今の言葉に合わせる",
+    hint: "表示中の手を見る",
   },
   panic: {
     label: "きもち：あせり",
-    rule: "そのまま",
-    hint: "言った手を出す",
+    rule: "見えてる手",
+    hint: "あいての手を見る",
   },
   trueEnd: {
     label: "きもち：ぴったり",
@@ -2843,7 +2849,9 @@ function setStageMood(mood) {
     "is-final-entry",
     "is-final-confirm",
     "is-cue-caution",
-    "is-cue-focus"
+    "is-cue-focus",
+    "is-cue-special",
+    "is-cue-sway"
   );
 
   if (mood) {
@@ -3129,7 +3137,7 @@ function buildDebugAnswerFromPsychEvent(event, line = "") {
   }
 
   const dynamicMode = event.dynamicMode ||
-    (event.feeling === "bait" ? "avoid" : event.feeling === "mirror" ? "mirror" : "");
+    (event.feeling === "bait" ? "avoid" : event.feeling === "mirror" ? "mirror" : event.feeling === "hesitate" ? "sway" : "");
   const avoidHand = event.avoidHand || event.dynamicAvoidHand || event.wordHand || event.saidHand || event.predictedHand || null;
   const resolvedCpuHand = event.resolvedCpuHand || null;
   const cpuHand = resolvedCpuHand || event.cpuHand || event.predictedHand || event.requestedHand || null;
@@ -3246,6 +3254,19 @@ function formatDebugAnswer(answer = state.debugAnswer) {
     ].join("\n");
   }
 
+  if (answer.dynamicMode === "sway") {
+    return [
+      "こたえ",
+      `セリフ：${line}`,
+      `きもち：${feelingText}`,
+      `読み方：${ruleText}`,
+      "本心：今の気持ちに合わせてほしい",
+      answer.resolvedPlayerHand ? `あなた：${playerName}` : "あなた：まだ未選択",
+      answer.cpuHand ? `あいて：${cpuName}` : "あいて：表示中の手に合わせる",
+      "あいこ：押した時に出ている手",
+    ].join("\n");
+  }
+
   return [
     "こたえ",
     `セリフ：${line}`,
@@ -3303,23 +3324,158 @@ function anotherHand(exceptHand) {
 function feelingInfo(feeling) {
   return FEELING_LABELS[feeling] || FEELING_LABELS.honest;
 }
+
+function isSpecialCueFeeling(feeling) {
+  return feeling === "bait" ||
+    feeling === "hide" ||
+    feeling === "hesitate" ||
+    feeling === "panic" ||
+    feeling === "mirror";
+}
+
+function specialCueMoodClasses(cue) {
+  if (!cue || !isSpecialCueFeeling(cue.feeling)) {
+    return undefined;
+  }
+
+  const classes = ["is-cue-special"];
+
+  if (cue.feeling === "hesitate") {
+    classes.push("is-cue-sway", "is-cue-caution");
+  } else if (cue.feeling === "mirror") {
+    classes.push("is-cue-focus");
+  } else {
+    classes.push("is-cue-caution");
+  }
+
+  return classes.join(" ");
+}
+
+function stopPsychCueMotion() {
+  if (psychCueMessageTimer) {
+    window.clearTimeout(psychCueMessageTimer);
+    psychCueMessageTimer = null;
+  }
+}
+
+function swayIntervalForCue() {
+  const level = getJankenTempoLevel(state.draw);
+  if (level >= 3) {
+    return 2000;
+  }
+
+  if (level >= 2) {
+    return 2300;
+  }
+
+  return 2800;
+}
+
+function swayCueLine(cue) {
+  const hand = cue?.activeHand || cue?.cpuHand || cue?.wordHand || randomCpuHand();
+  return `${handName(hand)}に\nしようかな…`;
+}
+
+function advanceSwayCue(cue, first = false) {
+  if (!cue || cue.dynamicMode !== "sway") {
+    return;
+  }
+
+  const choices = Array.isArray(cue.swayHands) && cue.swayHands.length >= 2
+    ? cue.swayHands
+    : [cue.wordHand || randomCpuHand(), cue.cpuHand || anotherHand(cue.wordHand || randomCpuHand())];
+
+  if (!cue.activeHand) {
+    cue.activeHand = choices[0];
+  } else if (!first) {
+    const nextIndex = (Math.max(0, choices.indexOf(cue.activeHand)) + 1) % choices.length;
+    cue.previousHand = cue.activeHand;
+    cue.activeHand = choices[nextIndex];
+    cue.changedAt = performance.now();
+  }
+
+  cue.cpuHand = cue.activeHand;
+  cue.line = swayCueLine(cue);
+  setDebugAnswerFromPsychEvent(cue, cue.line);
+  showMessage(cue.line, specialCueMoodClasses(cue), {
+    typewriter: first,
+    maxDuration: first ? 1550 : 900,
+    speed: first ? 54 : 32,
+  });
+}
+
+function startSwayCueMotion(cue) {
+  stopPsychCueMotion();
+
+  if (!cue || cue.dynamicMode !== "sway") {
+    return false;
+  }
+
+  if (!cue.swayHands || cue.swayHands.length < 2) {
+    const first = cue.wordHand || randomCpuHand();
+    cue.swayHands = [first, anotherHand(first)];
+  }
+
+  cue.activeHand = cue.activeHand || cue.swayHands[0];
+  cue.previousHand = null;
+  cue.changedAt = performance.now();
+  advanceSwayCue(cue, true);
+
+  const interval = swayIntervalForCue();
+  const tick = () => {
+    if (state.psychEvent !== cue || !state.started || state.busy || state.ended) {
+      stopPsychCueMotion();
+      return;
+    }
+
+    advanceSwayCue(cue, false);
+    psychCueMessageTimer = window.setTimeout(tick, interval);
+  };
+
+  psychCueMessageTimer = window.setTimeout(tick, interval);
+  return true;
+}
+
+function signalSpecialCue(cue) {
+  if (!cue || !isSpecialCueFeeling(cue.feeling)) {
+    return;
+  }
+
+  const now = Date.now();
+  if (now - lastSpecialCueSignalAt < 450) {
+    return;
+  }
+
+  lastSpecialCueSignalAt = now;
+  if (cue.feeling === "mirror") {
+    AudioManager.playSound("focus");
+  } else {
+    AudioManager.playCutinSfx();
+    AudioManager.playSound(cue.feeling === "hesitate" ? "focus" : "caution");
+  }
+}
+
 function isDifficultFeeling(feeling) {
   return feeling === "bait" || feeling === "hide" || feeling === "hesitate" || feeling === "panic";
 }
 
 function markReadCueDifficulty(cue) {
-  cabinet.classList.remove("is-cue-caution", "is-cue-focus");
+  cabinet.classList.remove("is-cue-caution", "is-cue-focus", "is-cue-special", "is-cue-sway");
 
   if (!cue || !cue.feeling) {
     return;
   }
 
-  if (isDifficultFeeling(cue.feeling)) {
-    cabinet.classList.add("is-cue-caution");
-    AudioManager.playSound(cue.feeling === "hesitate" ? "focus" : "caution");
-  } else if (cue.feeling === "mirror") {
-    cabinet.classList.add("is-cue-focus");
-    AudioManager.playSound("focus");
+  if (isSpecialCueFeeling(cue.feeling)) {
+    cabinet.classList.add("is-cue-special");
+    if (cue.feeling === "hesitate") {
+      cabinet.classList.add("is-cue-sway", "is-cue-caution");
+    } else if (cue.feeling === "mirror") {
+      cabinet.classList.add("is-cue-focus");
+    } else {
+      cabinet.classList.add("is-cue-caution");
+    }
+    signalSpecialCue(cue);
   } else if (cue.feeling === "match" && state.draw >= getChanceDrawCount()) {
     cabinet.classList.add("is-cue-focus");
   }
@@ -3367,19 +3523,15 @@ ${cpu}で続きたい`,
 
   if (cue.feeling === "hesitate") {
     return [
-      `${word}かな…
-でも${cpu}`,
-      `${word}…
-やっぱ${cpu}`,
+      swayCueLine(cue),
     ];
   }
 
   if (cue.feeling === "panic") {
     return [
-      `あっ…
-${cpu}で合わせたい`,
-      `ほんとは
-${cpu}だよ`,
+      `あっ…\nもう出しちゃった`,
+      `まって…\n手が見えてる…`,
+      `見ないで…\n出ちゃった`,
     ];
   }
 
@@ -3535,6 +3687,7 @@ function createReadCue() {
   let ruleText = "そのまま";
   let dynamicMode = "";
   let avoidHand = null;
+  let secondHand = null;
 
   if (feeling === "match") {
     imageMood = draw >= getChanceDrawCount() ? "draw" : "happy";
@@ -3561,9 +3714,11 @@ function createReadCue() {
     ruleText = "隠した手";
   } else if (feeling === "hesitate") {
     wordHand = randomCpuHand();
-    cpuHand = anotherHand(wordHand);
+    secondHand = anotherHand(wordHand);
+    cpuHand = wordHand;
+    dynamicMode = "sway";
     imageMood = draw >= getChanceDrawCount() ? "panic" : "worried";
-    ruleText = "あとが本音";
+    ruleText = "今の言葉に合わせる";
   } else if (feeling === "panic") {
     imageMood = "panic";
     ruleText = "そのまま";
@@ -3586,7 +3741,11 @@ function createReadCue() {
       ? "あなたの手＝あいての手"
       : dynamicMode === "avoid"
         ? `${handName(avoidHand)}以外＝あいてが合わせる`
-        : `セリフ＋${info.label.replace("きもち：", "")}＝${handName(cpuHand)}`,
+        : dynamicMode === "sway"
+          ? "今の言葉＝あいてが合わせる"
+          : feeling === "panic"
+            ? "見えてる手＝あいこ"
+            : `セリフ＋${info.label.replace("きもち：", "")}＝${handName(cpuHand)}`,
     cpuHand,
     wordHand,
     saidHand: wordHand,
@@ -3595,6 +3754,10 @@ function createReadCue() {
     avoidHand,
     dynamicAvoidHand: avoidHand,
     dynamicMode,
+    swayHands: feeling === "hesitate" ? [wordHand, secondHand] : null,
+    activeHand: feeling === "hesitate" ? wordHand : null,
+    previousHand: null,
+    changedAt: performance.now(),
     imageMood,
     mood: imageMood,
     honest,
@@ -3658,13 +3821,24 @@ function maybeStartPsychEvent(force = false) {
 
   setCharacter(cue.imageMood || cue.mood || "normal", cue.feeling, cue);
   clearCinematicCutIn();
+
+  if (cue.feeling === "panic") {
+    showPanicPreReveal(cue);
+  }
+
+  if (cue.dynamicMode === "sway") {
+    startSwayCueMotion(cue);
+    markReadCueDifficulty(cue);
+    return true;
+  }
+
   const line = psychEventLine(state.psychEvent);
   setDebugAnswerFromPsychEvent(state.psychEvent, line);
-  markReadCueDifficulty(cue);
-  showMessage(line, undefined, {
+  showMessage(line, specialCueMoodClasses(cue), {
     typewriter: true,
-    maxDuration: isDifficultFeeling(cue.feeling) ? 1840 : 1620,
+    maxDuration: isDifficultFeeling(cue.feeling) || isSpecialCueFeeling(cue.feeling) ? 1840 : 1620,
   });
+  markReadCueDifficulty(cue);
   return true;
 }
 
@@ -4833,6 +5007,32 @@ async function showTrueEnding({ replay = false } = {}) {
   }
 }
 
+
+function clearPreRevealedHands() {
+  playerHand?.closest(".hand-card")?.classList.remove("is-pre-revealed");
+  cpuHand?.closest(".hand-card")?.classList.remove("is-pre-revealed");
+}
+
+function showPanicPreReveal(cue) {
+  if (!cue || cue.feeling !== "panic" || !cue.cpuHand) {
+    return;
+  }
+
+  renderHand(playerHand, null);
+  renderHand(cpuHand, cue.cpuHand);
+  cpuHand?.closest(".hand-card")?.classList.add("is-pre-revealed");
+}
+
+function isPostTrueCompleteRun(scoreChange) {
+  return Boolean(scoreChange?.postTrueCompleted);
+}
+
+function postTrueCompleteResultLine(scoreChange) {
+  const draws = scoreChange?.completedDraws || state.draw || POST_TRUE_COMPLETE_DRAW_COUNT;
+  const medal = formatScoreValue(scoreChange?.medalRecordCurrent || state.pot);
+  return `完走！\n${draws}回 / ${medal}メダル`;
+}
+
 function renderHand(target, handKey) {
   const hand = hands[handKey];
   const handCard = target.closest(".hand-card");
@@ -4867,6 +5067,8 @@ function renderHand(target, handKey) {
 }
 
 function resetRoundView() {
+  stopPsychCueMotion();
+  clearPreRevealedHands();
   renderHand(playerHand, null);
   renderHand(cpuHand, null);
   setSelectedButton();
@@ -4937,7 +5139,7 @@ function chooseCpuHand(player, activeEvent = null) {
   if (event) {
     let cpuHand = event.cpuHand;
     const dynamicMode = event.dynamicMode ||
-      (event.feeling === "bait" ? "avoid" : event.feeling === "mirror" ? "mirror" : "");
+      (event.feeling === "bait" ? "avoid" : event.feeling === "mirror" ? "mirror" : event.feeling === "hesitate" ? "sway" : "");
 
     if (dynamicMode === "mirror") {
       cpuHand = player;
@@ -4965,6 +5167,26 @@ function chooseCpuHand(player, activeEvent = null) {
       }
 
       event.resolvedCpuHand = cpuHand;
+    } else if (dynamicMode === "sway") {
+      const activeHand = event.activeHand || event.cpuHand || event.wordHand || randomCpuHand();
+      const previousHand = event.previousHand || null;
+      const changedAt = Number(event.changedAt || 0);
+      const justChanged = changedAt && performance.now() - changedAt <= 260;
+      const accepted = player === activeHand || (justChanged && previousHand && player === previousHand);
+
+      event.dynamicMode = "sway";
+      event.resolvedPlayerHand = player;
+
+      if (accepted) {
+        // 表示中の手に合わせられたら、必ずあいこ。
+        cpuHand = player;
+      } else {
+        // 表示を読み違えた時だけ失敗。
+        cpuHand = handThatBeats(player) || randomCpuHand();
+      }
+
+      event.resolvedCpuHand = cpuHand;
+      event.cpuHand = cpuHand;
     }
 
     state.debugAnswer = buildDebugAnswerFromPsychEvent(event, event.line || state.debugAnswer?.line || "");
@@ -5028,6 +5250,7 @@ function cancelEndFlow() {
 
 function resetScore() {
   clearPendingChoice();
+  stopPsychCueMotion();
   clearCinematicCutIn();
   state.win = 0;
   state.lose = 0;
@@ -5053,6 +5276,7 @@ function resetScore() {
 
 function cleanupForTitle() {
   clearPendingChoice();
+  stopPsychCueMotion();
   stopCountdown();
   stopChanceMessages();
   clearCinematicCutIn();
@@ -5065,6 +5289,7 @@ function cleanupForTitle() {
   state.showingTrueEnding = false;
   setSelectedButton();
   setButtonsEnabled(false);
+  clearPreRevealedHands();
   renderHand(playerHand, null);
   renderHand(cpuHand, null);
   setStageMood();
@@ -5074,7 +5299,7 @@ function cleanupForTitle() {
   sceneOverlay.classList.remove("has-illustration");
   sceneIllustration.hidden = true;
   closeアルバム(false);
-  cabinet.classList.remove("is-scene", "scene-intro", "scene-playerWin", "scene-playerLose", "is-playing", "is-ended", "end-win", "end-lose");
+  cabinet.classList.remove("is-scene", "scene-intro", "scene-playerWin", "scene-playerLose", "is-playing", "is-ended", "end-win", "end-lose", "is-post-true-complete");
 }
 
 function showTitle() {
@@ -5208,6 +5433,63 @@ function handleアルバムUnlockForEnding(result) {
   return routeId;
 }
 
+
+async function endPostTrueCompletion(result, scoreChange) {
+  cancelEndFlow();
+  const flowId = state.flowId;
+  state.ended = true;
+  state.busy = false;
+  state.psychEvent = null;
+  state.nextCallMode = "normal";
+  stopChanceMessages();
+  stopPsychCueMotion();
+  clearPendingChoice();
+  clearPreRevealedHands();
+  setSelectedButton();
+  setButtonsEnabled(false);
+  cabinet.classList.add("is-ended", "is-post-true-complete", `end-${result}`);
+  cabinet.classList.remove(result === "win" ? "end-lose" : "end-win");
+
+  const countdownWrap = countdown ? countdown.closest(".countdown") : null;
+  retryButton.hidden = true;
+  if (countdownWrap) {
+    countdownWrap.hidden = true;
+  }
+
+  finalTitle.textContent = "完走！";
+  finalMessage.textContent = `${scoreChange?.completedDraws || POST_TRUE_COMPLETE_DRAW_COUNT}回 あいこ`;
+  endOverlay.hidden = false;
+
+  AudioManager.switchBgm("final");
+  AudioManager.playSound("chance");
+  setCharacter(result === "win" ? "shocked" : "smug");
+  renderHand(playerHand, null);
+  renderHand(cpuHand, null);
+  showMessage("完走…\n最後は見えない一手", "is-result is-final-entry is-cue-caution is-complete-run", {
+    typewriter: true,
+    maxDuration: 1700,
+  });
+
+  await wait(1700);
+
+  if (flowId !== state.flowId) {
+    return;
+  }
+
+  AudioManager.playSound(result === "win" ? "youwin" : "lose");
+  showMessage(
+    result === "win" ? "最後の一手、\nあなたの勝ち" : "最後の一手、\nあいての勝ち",
+    `is-result is-${cpuMoodForResult(result)} player-${result} is-complete-run`,
+    { typewriter: true, maxDuration: 1500 }
+  );
+
+  await wait(2100);
+
+  if (flowId === state.flowId) {
+    returnToTitleWithBlackout();
+  }
+}
+
 async function endGame(result) {
   cancelEndFlow();
   const flowId = state.flowId;
@@ -5295,6 +5577,9 @@ function addRoundScore(result) {
     finalResult: null,
     postTrueNewRecord: false,
     medalNewRecord: false,
+    postTrueCompleted: false,
+    postTrueCompleteResult: null,
+    completedDraws: 0,
     medalRecordPrevious: getBestMedalRecord(),
     medalRecordCurrent: state.pot,
   };
@@ -5308,6 +5593,12 @@ function addRoundScore(result) {
     scoreChange.medalRecordPrevious = medalRecord.previous;
     scoreChange.medalRecordCurrent = medalRecord.current;
     scoreChange.postTrueNewRecord = checkPostTrueDrawRecord();
+
+    if (getアルバムProgress().trueEndSeen === true && state.draw >= POST_TRUE_COMPLETE_DRAW_COUNT) {
+      scoreChange.postTrueCompleted = true;
+      scoreChange.postTrueCompleteResult = Math.random() < 0.5 ? "win" : "lose";
+      scoreChange.completedDraws = state.draw;
+    }
 
     if (state.draw >= getDrawWarningCount() && !state.drawWarningShown) {
       state.drawWarningShown = true;
@@ -5447,6 +5738,7 @@ async function playRound(player) {
   // 表示中の心理イベントを、ラウンド開始時点で確実に確保する。
   // resetRoundView() やキャラ更新の影響でイベントが消えても、このラウンドだけは同じ判定を使う。
   const activePsychEvent = state.psychEvent ? { ...state.psychEvent } : null;
+  stopPsychCueMotion();
   state.finalConfirmHand = null;
   cabinet.classList.remove("is-final-confirm");
   stopChanceMessages();
@@ -5464,12 +5756,16 @@ async function playRound(player) {
   const result = judge(player, cpu);
   const scoreChange = addRoundScore(result);
 
-  const calls = callMode === "draw" ? ["あいこで"] : ["じゃん", "けん"];
+  // 掛け声のリズムを3拍で統一する。
+  // じゃん / けん / ぽん！
+  // あいこ / で / しょ！
+  // 表示文字は変えず、「あいこでしょ」を分割して同じテンポにする。
+  const calls = callMode === "draw" ? ["あいこ", "で"] : ["じゃん", "けん"];
   const revealCall = callMode === "draw" ? "しょ！" : "ぽん！";
 
   for (const [index, call] of calls.entries()) {
-    const callSound = callMode === "draw" ? "call1" : index === 0 ? "call1" : "call2";
-    const beatClass = callMode === "draw" ? "is-beat-1" : index === 0 ? "is-beat-1" : "is-beat-2";
+    const callSound = index === 0 ? "call1" : "call2";
+    const beatClass = index === 0 ? "is-beat-1" : "is-beat-2";
     showMessage(call, "is-calling");
     AudioManager.playJankenCallSfx(callSound);
     playCharacterBeat(beatClass);
@@ -5509,7 +5805,17 @@ async function playRound(player) {
   }
   setResultLabel(result, scoreChange.points || scoreChange.bonus, scoreChange.finalResolved);
 
-  if (scoreChange.finalResolved) {
+  if (scoreChange.postTrueCompleted) {
+    AudioManager.switchBgm("final");
+    AudioManager.playSound("chance");
+    setCharacter("shocked");
+    renderHand(playerHand, null);
+    renderHand(cpuHand, null);
+    showMessage(postTrueCompleteResultLine(scoreChange), "is-result is-draw player-draw is-complete-run", {
+      typewriter: true,
+      maxDuration: 1500,
+    });
+  } else if (scoreChange.finalResolved) {
     const finalLine = result === "win"
       ? randomLine(dialogue.final.cpuLose)
       : randomLine(dialogue.final.cpuWin);
@@ -5567,7 +5873,7 @@ async function playRound(player) {
 
   state.nextCallMode = result === "draw" ? "draw" : "normal";
 
-  const roundEndsMatch = scoreChange.finalResolved || state.win >= MATCH_POINT || state.lose >= MATCH_POINT;
+  const roundEndsMatch = scoreChange.finalResolved || scoreChange.postTrueCompleted || state.win >= MATCH_POINT || state.lose >= MATCH_POINT;
   const resultPauseBase = roundEndsMatch
     ? 2300
     : scoreChange.chanceStarted
@@ -5586,7 +5892,11 @@ async function playRound(player) {
 
   if (roundEndsMatch) {
     clearPendingChoice();
-    endGame(scoreChange.finalResolved ? scoreChange.finalResult : state.win >= MATCH_POINT ? "win" : "lose");
+    if (scoreChange.postTrueCompleted) {
+      await endPostTrueCompletion(scoreChange.postTrueCompleteResult || "lose", scoreChange);
+    } else {
+      endGame(scoreChange.finalResolved ? scoreChange.finalResult : state.win >= MATCH_POINT ? "win" : "lose");
+    }
     endPlayRoundTimer();
     return;
   }

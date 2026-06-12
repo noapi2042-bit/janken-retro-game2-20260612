@@ -5363,7 +5363,7 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 }
 
 
-/* ===== 20260613-ui-clean-strip1: aiko communication rules ===== */
+/* ===== 20260613-panic-complete-run1: aiko communication rules ===== */
 .cabinet.is-cue-focus .message {
   border-color: rgba(170, 255, 220, 0.96) !important;
   color: #eafff7 !important;
@@ -5379,7 +5379,7 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 }
 
 
-/* ===== 20260613-ui-clean-strip1: HARD mobile layout reset ===== */
+/* ===== 20260613-panic-complete-run1: HARD mobile layout reset ===== */
 
 /* スマホでは、上の進行チップとセリフ枠を絶対に重ねない */
 #medalRecordHud {
@@ -5584,7 +5584,7 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 }
 
 
-/* ===== 20260613-ui-clean-strip1: clean mobile UI without overlapping progress chips ===== */
+/* ===== 20260613-panic-complete-run1: clean mobile UI without overlapping progress chips ===== */
 
 /* 進行チップがセリフ枠に重なり続けたため、通常画面から外す。
    目的・あいこ・チャンス情報は、セリフとスコア表示で伝える。 */
@@ -5697,5 +5697,144 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 
   .hand-card {
     min-height: 76px !important;
+  }
+}
+
+
+/* ===== 20260613-panic-complete-run1: special cue notice / moving hesitation ===== */
+
+.cabinet.is-cue-special .show-window::before {
+  opacity: 1 !important;
+  background:
+    radial-gradient(circle at 50% 36%, rgba(255, 242, 120, 0.26), transparent 42%),
+    radial-gradient(circle at 50% 62%, rgba(168, 255, 112, 0.14), transparent 58%) !important;
+  animation: special-cue-flash 0.52s ease-out both;
+}
+
+.cabinet.is-cue-special .message {
+  border-color: rgba(255, 238, 98, 0.98) !important;
+  color: #fff8a8 !important;
+  background:
+    linear-gradient(180deg, rgba(255, 225, 70, 0.12), rgba(0, 0, 0, 0.04)),
+    rgba(30, 18, 0, 0.86) !important;
+  box-shadow:
+    inset 0 0 18px rgba(255, 225, 80, 0.18),
+    0 0 18px rgba(255, 225, 80, 0.22) !important;
+}
+
+.cabinet.is-cue-special .message::before {
+  content: "!";
+  position: absolute;
+  left: 9px;
+  top: 7px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  color: #1c1000;
+  background: linear-gradient(#fff7a4, #ffbd2e);
+  border: 2px solid rgba(255, 250, 190, 0.9);
+  border-radius: 50%;
+  font-size: 0.78rem;
+  line-height: 1;
+  text-shadow: none;
+  box-shadow: 0 0 10px rgba(255, 221, 70, 0.45);
+}
+
+.cabinet.is-cue-sway .message {
+  border-color: rgba(205, 178, 255, 0.98) !important;
+  color: #efe5ff !important;
+  background:
+    linear-gradient(180deg, rgba(190, 150, 255, 0.14), rgba(0, 0, 0, 0.04)),
+    rgba(22, 10, 42, 0.86) !important;
+  animation: sway-message-pulse 0.9s ease-in-out both;
+}
+
+.cabinet.is-cue-sway .mood-badge {
+  animation: sway-badge 0.9s ease-in-out both;
+}
+
+@keyframes special-cue-flash {
+  0% { filter: brightness(1.7); transform: scale(0.98); }
+  100% { filter: brightness(1); transform: scale(1); }
+}
+
+@keyframes sway-message-pulse {
+  0% { transform: translateX(-50%) scale(1); }
+  35% { transform: translateX(-50%) scale(1.035); }
+  100% { transform: translateX(-50%) scale(1); }
+}
+
+@keyframes sway-badge {
+  0% { transform: translateX(-50%) rotate(-1deg); }
+  50% { transform: translateX(-50%) rotate(1deg); }
+  100% { transform: translateX(-50%) rotate(0deg); }
+}
+
+@media (max-width: 380px) {
+  .cabinet.is-cue-special .message::before {
+    width: 17px;
+    height: 17px;
+    font-size: 0.68rem;
+    left: 7px;
+    top: 6px;
+  }
+}
+
+
+/* ===== 20260613-panic-complete-run1: panic pre-reveal + complete run ===== */
+
+.hand-card.is-pre-revealed {
+  border-color: rgba(255, 238, 98, 0.98) !important;
+  background:
+    linear-gradient(180deg, rgba(255, 225, 80, 0.16), transparent 34%),
+    rgba(34, 18, 0, 0.46) !important;
+  box-shadow:
+    inset 0 0 16px rgba(255, 225, 80, 0.18),
+    0 0 16px rgba(255, 225, 80, 0.22) !important;
+  animation: pre-reveal-hand-pulse 0.72s ease-out both;
+}
+
+.hand-card.is-pre-revealed::before {
+  content: "先に出てる";
+  position: absolute;
+  left: 50%;
+  top: -12px;
+  transform: translateX(-50%);
+  z-index: 7;
+  padding: 2px 7px 3px;
+  color: #241300;
+  background: linear-gradient(#fff7a4, #ffbd2e);
+  border: 2px solid rgba(255, 250, 190, 0.95);
+  border-radius: 999px;
+  font-size: clamp(0.56rem, 2.5vw, 0.72rem);
+  line-height: 1;
+  white-space: nowrap;
+  text-shadow: none;
+  box-shadow: 0 0 10px rgba(255, 221, 70, 0.45);
+}
+
+.cabinet.is-post-true-complete .message,
+.cabinet .message.is-complete-run {
+  border-color: rgba(255, 242, 120, 0.98) !important;
+  color: #fff8bd !important;
+  background:
+    linear-gradient(180deg, rgba(255, 230, 110, 0.16), rgba(80, 15, 0, 0.08)),
+    rgba(24, 13, 0, 0.9) !important;
+  box-shadow:
+    inset 0 0 18px rgba(255, 230, 110, 0.2),
+    0 0 20px rgba(255, 230, 110, 0.26) !important;
+}
+
+@keyframes pre-reveal-hand-pulse {
+  0% { transform: scale(0.96); filter: brightness(1.45); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+
+@media (max-width: 380px) {
+  .hand-card.is-pre-revealed::before {
+    top: -10px;
+    font-size: clamp(0.5rem, 2.25vw, 0.64rem);
+    padding-inline: 5px;
   }
 }
