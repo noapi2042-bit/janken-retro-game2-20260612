@@ -5363,7 +5363,7 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 }
 
 
-/* ===== 20260613-ui-hardfix1: aiko communication rules ===== */
+/* ===== 20260613-ui-clean-strip1: aiko communication rules ===== */
 .cabinet.is-cue-focus .message {
   border-color: rgba(170, 255, 220, 0.96) !important;
   color: #eafff7 !important;
@@ -5379,7 +5379,7 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 }
 
 
-/* ===== 20260613-ui-hardfix1: HARD mobile layout reset ===== */
+/* ===== 20260613-ui-clean-strip1: HARD mobile layout reset ===== */
 
 /* スマホでは、上の進行チップとセリフ枠を絶対に重ねない */
 #medalRecordHud {
@@ -5580,5 +5580,122 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
   .choice-hand-image {
     max-width: 45px !important;
     max-height: 45px !important;
+  }
+}
+
+
+/* ===== 20260613-ui-clean-strip1: clean mobile UI without overlapping progress chips ===== */
+
+/* 進行チップがセリフ枠に重なり続けたため、通常画面から外す。
+   目的・あいこ・チャンス情報は、セリフとスコア表示で伝える。 */
+#aikoGuideHud,
+#aikoGuideHud span {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* hiddenになったガイドの下で、stageを自然に開始させる */
+#aikoGuideHud + .stage {
+  padding-top: 8px !important;
+  margin-top: 0 !important;
+  gap: 8px !important;
+}
+
+/* セリフ枠は上に独立させ、他のUIと重ねない */
+#aikoGuideHud + .stage .show-window,
+.show-window {
+  min-height: min(67vw, 280px) !important;
+  padding: 76px 0 28px !important;
+  overflow: visible !important;
+}
+
+#message.message {
+  position: absolute !important;
+  z-index: 10 !important;
+  top: 0 !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  width: min(94%, 334px) !important;
+  min-height: 68px !important;
+  max-height: 104px !important;
+  padding: 9px 14px 12px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+  font-size: clamp(1.12rem, 5vw, 1.62rem) !important;
+  line-height: 1.18 !important;
+  letter-spacing: 0 !important;
+  white-space: pre-line !important;
+}
+
+#message.message.is-long-message {
+  font-size: clamp(0.98rem, 4.35vw, 1.32rem) !important;
+  line-height: 1.2 !important;
+}
+
+#message.message.is-very-long-message {
+  font-size: clamp(0.86rem, 3.85vw, 1.1rem) !important;
+  line-height: 1.22 !important;
+}
+
+/* キャラと手札も少し整理 */
+.character-frame {
+  width: min(73vw, 278px) !important;
+  height: min(50vw, 206px) !important;
+}
+
+.hands {
+  width: min(100%, 308px) !important;
+  min-height: 82px !important;
+  grid-template-columns: minmax(0, 1fr) 36px minmax(0, 1fr) !important;
+  gap: 6px !important;
+}
+
+.hand-card {
+  min-height: 80px !important;
+}
+
+.control-panel {
+  margin-top: 5px !important;
+  padding-top: 9px !important;
+  padding-bottom: max(7px, env(safe-area-inset-bottom)) !important;
+}
+
+@media (max-width: 380px) {
+  #aikoGuideHud + .stage {
+    padding-top: 6px !important;
+  }
+
+  #aikoGuideHud + .stage .show-window,
+  .show-window {
+    min-height: min(64vw, 256px) !important;
+    padding-top: 70px !important;
+    padding-bottom: 24px !important;
+  }
+
+  #message.message {
+    min-height: 62px !important;
+    max-height: 94px !important;
+    font-size: clamp(1rem, 4.55vw, 1.42rem) !important;
+  }
+
+  #message.message.is-long-message {
+    font-size: clamp(0.9rem, 4.05vw, 1.18rem) !important;
+  }
+
+  .character-frame {
+    width: min(70vw, 256px) !important;
+    height: min(46vw, 186px) !important;
+  }
+
+  .hands {
+    width: min(100%, 292px) !important;
+    min-height: 78px !important;
+  }
+
+  .hand-card {
+    min-height: 76px !important;
   }
 }

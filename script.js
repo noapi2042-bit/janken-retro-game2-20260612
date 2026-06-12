@@ -389,7 +389,7 @@ const CHOICE_BUFFER_MS = 900;
 
 const urlParams = new URLSearchParams(window.location.search);
 const DEBUG_MODE = urlParams.has("debug");
-const ASSET_VERSION = "20260613-ui-hardfix1";
+const ASSET_VERSION = "20260613-ui-clean-strip1";
 
 function assetPath(src) {
   if (!src || /^(?:data:|blob:|https?:)/.test(src) || src.includes("?v=")) {
@@ -2717,6 +2717,11 @@ function updateAikoGuideHud() {
   if (!aikoGuideHud) {
     return;
   }
+
+  // スマホ実機でこの3連チップがセリフ枠に重なりやすかったため、
+  // いったん通常画面では非表示にする。必要な情報はセリフとスコアに寄せる。
+  aikoGuideHud.hidden = true;
+  return;
 
   const draw = Math.max(0, state.draw || 0);
   const chanceCount = getChanceDrawCount();
