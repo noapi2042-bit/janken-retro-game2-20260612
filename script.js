@@ -389,7 +389,7 @@ const CHOICE_BUFFER_MS = 900;
 
 const urlParams = new URLSearchParams(window.location.search);
 const DEBUG_MODE = urlParams.has("debug");
-const ASSET_VERSION = "20260613-aiko-dynamic-fix1";
+const ASSET_VERSION = "20260613-ui-intro-dialogue1";
 
 function assetPath(src) {
   if (!src || /^(?:data:|blob:|https?:)/.test(src) || src.includes("?v=")) {
@@ -559,10 +559,10 @@ const SCENE_INTRO_LINES = [
   "メダルを とろう！",
 ];
 const SCENE_PLAYER_WIN_LINES = [
-  "すごいね、あなたの勝ちだよ。楽しかったから、また勝負してね！",
-  "まけちゃった…。でもすごく楽しかったよ。また遊びに来てね。",
-  "あなたの勝ちだね。次はもっと強くなって待ってるね！",
-  "くやしいけど、楽しかったよ。よかったら、また勝負しよ？",
+  "あなたの勝ちだね。ちゃんと見てくれてたんだ。",
+  "でも、あいこなら、もう少し続けられるよ。",
+  "私のきもちも、少しだけ読んでみて。",
+  "また、あいこから始めよう？",
 ];
 const SCENE_PLAYER_LOSE_LINES = [
   "ここまで遊んでくれてありがとう。もう一回だけ、勝負してみる？",
@@ -3804,8 +3804,25 @@ async function showIntroThenReady() {
   setButtonsEnabled(false);
   resetRoundView();
 
-  showMessage("まずは30まい。\n勝ってメダルを取ろう", undefined, { typewriter: true, maxDuration: 1320 });
-  await wait(1280);
+  // 最初だけは少し丁寧に読ませる。
+  // ここで目的とメダルの増え方を、説明っぽくなりすぎない言葉で伝える。
+  showMessage("まずは 30まい。\nメダルをあつめよう", undefined, {
+    typewriter: true,
+    maxDuration: 3400,
+    speed: 88,
+  });
+  await wait(2150);
+
+  if (flowId !== state.flowId || !state.started || state.ended) {
+    return;
+  }
+
+  showMessage("あいこが続くと\nメダルも大きくなるよ", undefined, {
+    typewriter: true,
+    maxDuration: 3600,
+    speed: 82,
+  });
+  await wait(2450);
 
   if (flowId !== state.flowId || !state.started || state.ended) {
     return;
@@ -4501,7 +4518,8 @@ function typeSceneLine(text) {
 
     const fullText = String(text || "");
     const currentId = sceneTypingId;
-    const speed = fullText.length > 28 ? 28 : 36;
+    // クリア後の会話は、ルール説明も兼ねるので少しだけゆっくり読ませる。
+    const speed = fullText.length > 28 ? 36 : 46;
     let index = 0;
 
     sceneTypingResolve = resolve;
@@ -4710,26 +4728,26 @@ function getNextGoalHintLine(currentRouteId) {
 
   if (missingRoutes.length === 0) {
     if (!progress.trueEndSeen) {
-      return "思い出は全部そろったね。\nほんとのこと、話してもいい？";
+      return "ぜんぶ見てくれたんだね。\n少しだけ、話したいことがあるの。";
     }
 
-    return "また遊びに来てくれてありがとう。";
+    return "また最初のあいこから、\n一緒に遊ぼう。";
   }
 
   if (missingRoutes.includes("normalWin")) {
-    return "あとは普通の勝利も\n見てみて？";
+    return "普通に勝った時の顔も、\nまだ見せてないかも。";
   }
 
   if (missingRoutes.includes("chanceWin")) {
-    return "次はあいこを続けて\nチャンスタイムを見つけて？";
+    return "あいこが続くと、\nチャンスが来るかも。";
   }
 
   if (missingRoutes.includes("finalWin")) {
-    return "次はもっと長くあいこ。\n最後の勝負まで来て？";
+    return "もっと長く続いたら、\n最後の一回が来るよ。";
   }
 
   if (missingRoutes.includes("gameOver")) {
-    return "負けた時にも\n別の思い出があるかも。";
+    return "負けた時の私も、\n少しだけ見てほしいかも。";
   }
 
   return "まだ見ていない思い出が\nどこかにあるよ。";
@@ -4742,29 +4760,31 @@ function endingLinesForRoute(routeId) {
 
   if (routeId === "normalWin") {
     return [
-      "今日はあなたの勝ちだね。",
-      "ここからは練習だよ。",
-      "きもちの下の言葉が\n読み方のヒント。",
-      "あわせたい＝同じ手。\nすなお＝そのまま。",
-      "まずはあいこを続けて\nチャンスタイムへ行こう。",
+      "今日は、あなたの勝ちだね。",
+      "でもね、あいこだと\nもう少し一緒にいられるの。",
+      "私の「きもち」も、\n少しだけ見てみて。",
+      "あわせたい時は、\n同じ手で待ってるね。",
+      "すなおな時は、\n言った手をそのまま出すよ。",
       getNextGoalHintLine(routeId),
     ];
   }
 
   if (routeId === "chanceWin") {
     return [
-      "チャンスタイムまで\n見つけたんだね。",
-      "次は少しだけ難しくなるよ。",
-      "まよい＝あとが本音。\nためす＝見せた手を外す。",
+      "チャンスまで来てくれたね。\nちょっと嬉しい。",
+      "でも時々、迷ったり、\n試したりしちゃう。",
+      "迷った時は、\nあとに言った方が本音。",
+      "試してる時は、\n見せた手にひっかからないで。",
       getNextGoalHintLine(routeId),
     ];
   }
 
   if (routeId === "finalWin") {
     return [
-      "最後の勝負まで\n来てくれたんだね。",
-      "もう読み方は覚えてきたね。",
-      "この先は、記録を伸ばす\nスコアアタックだよ。",
+      "最後の一回まで\n付き合ってくれたんだね。",
+      "ここまで読んでくれたの、\nちゃんと分かったよ。",
+      "勝ち負けより、\n続いた時間がうれしかった。",
+      "また、最初のあいこから\n始めてくれる？",
       getNextGoalHintLine(routeId),
     ];
   }

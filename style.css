@@ -5363,7 +5363,7 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 }
 
 
-/* ===== 20260613-aiko-dynamic-fix1: aiko communication rules ===== */
+/* ===== 20260613-ui-intro-dialogue1: aiko communication rules ===== */
 .cabinet.is-cue-focus .message {
   border-color: rgba(170, 255, 220, 0.96) !important;
   color: #eafff7 !important;
@@ -5376,4 +5376,168 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 
 .debug-answer-hud {
   white-space: pre-wrap !important;
+}
+
+
+/* ===== 20260613-ui-intro-dialogue1: mobile UI spacing / readable intro polish ===== */
+
+/* 進行チップがセリフ枠に重ならないよう、ここで最終的に間隔を固定 */
+.aiko-guide-hud {
+  position: relative !important;
+  z-index: 3 !important;
+  width: min(96%, 360px) !important;
+  margin: 8px auto 15px !important;
+  padding: 0 !important;
+  grid-template-columns: 0.86fr 1.12fr 0.92fr !important;
+  gap: 7px !important;
+  transform: none !important;
+}
+
+.aiko-guide-hud span {
+  min-height: 25px !important;
+  padding: 3px 7px 4px !important;
+  line-height: 1.05 !important;
+  border-width: 2px !important;
+  overflow: hidden !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
+}
+
+/* セリフ枠は必ずチップの下から始める */
+.stage {
+  padding-top: 0 !important;
+  gap: 8px !important;
+}
+
+.show-window {
+  min-height: min(70vw, 292px) !important;
+  padding: 82px 0 30px !important;
+  overflow: visible !important;
+}
+
+.message {
+  top: 0 !important;
+  width: min(95%, 344px) !important;
+  min-height: 72px !important;
+  max-height: 112px !important;
+  padding: 10px 14px 13px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+  font-size: clamp(1.18rem, 5.35vw, 1.78rem) !important;
+  line-height: 1.17 !important;
+  letter-spacing: 0 !important;
+}
+
+.message.is-long-message {
+  font-size: clamp(1.02rem, 4.55vw, 1.42rem) !important;
+  line-height: 1.18 !important;
+}
+
+.message.is-very-long-message {
+  font-size: clamp(0.9rem, 4vw, 1.18rem) !important;
+  line-height: 1.2 !important;
+}
+
+/* キャラ表示を少しだけ下げ、セリフ枠の下端とかぶらないようにする */
+.character-frame {
+  width: min(76vw, 294px) !important;
+  height: min(53vw, 222px) !important;
+}
+
+.mood-badge {
+  bottom: 12px !important;
+  z-index: 6 !important;
+}
+
+/* 手札と操作パネルは見切れない範囲で少し締める */
+.hands {
+  width: min(100%, 318px) !important;
+  min-height: 90px !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+.hand-card {
+  min-height: 86px !important;
+}
+
+.control-panel {
+  margin-top: 5px !important;
+  padding-top: 9px !important;
+  padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+}
+
+.input-guide {
+  top: -26px !important;
+  z-index: 6 !important;
+}
+
+/* シーン会話も読みやすく。長い説明を避けても、文字が詰まらないようにする */
+.scene-message {
+  line-height: 1.38 !important;
+  word-break: keep-all !important;
+  overflow-wrap: anywhere !important;
+}
+
+@media (max-width: 380px) {
+  .scoreboard {
+    gap: 6px !important;
+  }
+
+  .scoreboard span {
+    min-height: 47px !important;
+  }
+
+  .aiko-guide-hud {
+    width: min(96%, 340px) !important;
+    margin: 7px auto 14px !important;
+    gap: 5px !important;
+    font-size: clamp(0.58rem, 2.55vw, 0.72rem) !important;
+  }
+
+  .aiko-guide-hud span {
+    min-height: 23px !important;
+    padding: 3px 4px !important;
+  }
+
+  .show-window {
+    min-height: min(68vw, 274px) !important;
+    padding-top: 78px !important;
+    padding-bottom: 28px !important;
+  }
+
+  .message {
+    min-height: 66px !important;
+    max-height: 104px !important;
+    padding: 9px 12px 12px !important;
+    font-size: clamp(1.04rem, 4.85vw, 1.5rem) !important;
+  }
+
+  .message.is-long-message {
+    font-size: clamp(0.92rem, 4.25vw, 1.22rem) !important;
+  }
+
+  .message.is-very-long-message {
+    font-size: clamp(0.8rem, 3.75vw, 1.02rem) !important;
+  }
+
+  .character-frame {
+    width: min(72vw, 264px) !important;
+    height: min(49vw, 198px) !important;
+  }
+
+  .hands {
+    width: min(100%, 300px) !important;
+    min-height: 84px !important;
+  }
+
+  .hand-card {
+    min-height: 82px !important;
+  }
+
+  .choice {
+    min-height: 82px !important;
+  }
 }
