@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>あいこメダル</title>
-    <link rel="stylesheet" href="style.css?v=20260612-mobile-audit-fix2">
+    <link rel="stylesheet" href="style.css?v=20260612-deep-audit-fix1">
   </head>
   <body>
     <main class="cabinet" aria-label="レトロアーケードじゃんけんゲーム">
@@ -77,12 +77,17 @@
             <span class="score-win">あなた <strong id="winCount">0</strong></span>
             <span class="score-pot">メダル <strong id="potCount">5</strong></span>
             <span class="score-lose">あいて <strong id="loseCount">0</strong></span>
-            <span class="score-draw" hidden>あいこ <strong id="drawCount">0</strong></span>
+            <span class="score-draw">あいこ <strong id="drawCount">0</strong></span>
           </div>
           <div id="medalRecordHud" class="medal-record-hud" aria-live="polite">
             <span>いま <strong id="currentMedalRecord">5</strong></span>
             <span>きろく <strong id="bestMedalRecord">0</strong></span>
             <em id="newMedalRecordBadge" hidden>新記録</em>
+          </div>
+          <div id="aikoGuideHud" class="aiko-guide-hud" aria-live="polite">
+            <span id="phaseLabel">ふつう</span>
+            <span id="nextChanceLabel">チャンスまで あと5</span>
+            <span id="nextFinalLabel">さいごまで あと15</span>
           </div>
 
           <div class="stage">
@@ -125,19 +130,19 @@
         <div class="choice-buttons">
           <button class="choice rock" type="button" data-hand="rock" aria-label="ぐー" disabled>
             <span class="choice-icon">
-              <img src="assets/images/janken_gu.png?v=20260612-mobile-audit-fix2" alt="" class="choice-hand-image" decoding="async" loading="eager">
+              <img src="assets/images/janken_gu.png?v=20260612-deep-audit-fix1" alt="" class="choice-hand-image" decoding="async" loading="eager">
             </span>
             <span>ぐー</span>
           </button>
           <button class="choice scissors" type="button" data-hand="scissors" aria-label="ちょき" disabled>
             <span class="choice-icon">
-              <img src="assets/images/janken_choki.png?v=20260612-mobile-audit-fix2" alt="" class="choice-hand-image" decoding="async" loading="eager">
+              <img src="assets/images/janken_choki.png?v=20260612-deep-audit-fix1" alt="" class="choice-hand-image" decoding="async" loading="eager">
             </span>
             <span>ちょき</span>
           </button>
           <button class="choice paper" type="button" data-hand="paper" aria-label="ぱー" disabled>
             <span class="choice-icon">
-              <img src="assets/images/janken_pa.png?v=20260612-mobile-audit-fix2" alt="" class="choice-hand-image" decoding="async" loading="eager">
+              <img src="assets/images/janken_pa.png?v=20260612-deep-audit-fix1" alt="" class="choice-hand-image" decoding="async" loading="eager">
             </span>
             <span>ぱー</span>
           </button>
@@ -145,6 +150,6 @@
       </section>
     </main>
 
-    <script src="script.js?v=20260612-mobile-audit-fix2"></script>
+    <script src="script.js?v=20260612-deep-audit-fix1"></script>
   </body>
 </html>
