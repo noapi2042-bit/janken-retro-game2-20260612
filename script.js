@@ -389,7 +389,7 @@ const CHOICE_BUFFER_MS = 900;
 
 const urlParams = new URLSearchParams(window.location.search);
 const DEBUG_MODE = urlParams.has("debug");
-const ASSET_VERSION = "20260613-aiko-communication1";
+const ASSET_VERSION = "20260613-aiko-dynamic-fix1";
 
 function assetPath(src) {
   if (!src || /^(?:data:|blob:|https?:)/.test(src) || src.includes("?v=")) {
@@ -3123,8 +3123,9 @@ function buildDebugAnswerFromPsychEvent(event, line = "") {
     return null;
   }
 
-  const dynamicMode = event.dynamicMode || "";
-  const avoidHand = event.avoidHand || event.dynamicAvoidHand || null;
+  const dynamicMode = event.dynamicMode ||
+    (event.feeling === "bait" ? "avoid" : event.feeling === "mirror" ? "mirror" : "");
+  const avoidHand = event.avoidHand || event.dynamicAvoidHand || event.wordHand || event.saidHand || event.predictedHand || null;
   const resolvedCpuHand = event.resolvedCpuHand || null;
   const cpuHand = resolvedCpuHand || event.cpuHand || event.predictedHand || event.requestedHand || null;
   const wordHand = event.wordHand || event.saidHand || event.predictedHand || event.requestedHand || cpuHand || avoidHand;
@@ -4889,7 +4890,7 @@ function cpuHandForForcedResult(player, result) {
   return randomCpuHand();
 }
 
-function chooseCpuHand(player) {
+function chooseCpuHand(player, activeEvent = null) {
   if (state.debugForceNextResult) {
     const forcedResult = state.debugForceNextResult;
     state.debugForceNextResult = null;
@@ -4908,35 +4909,45 @@ function chooseCpuHand(player) {
     return forcedCpu;
   }
 
-  if (state.psychEvent) {
-    const event = state.psychEvent;
-    let cpuHand = event.cpuHand;
+  const event = activeEvent || state.psychEvent;
 
-    if (event.dynamicMode === "mirror") {
+  if (event) {
+    let cpuHand = event.cpuHand;
+    const dynamicMode = event.dynamicMode ||
+      (event.feeling === "bait" ? "avoid" : event.feeling === "mirror" ? "mirror" : "");
+
+    if (dynamicMode === "mirror") {
       cpuHand = player;
+      event.dynamicMode = "mirror";
       event.resolvedPlayerHand = player;
       event.resolvedCpuHand = cpuHand;
-    } else if (event.dynamicMode === "avoid") {
-      const avoidHand = event.avoidHand || event.dynamicAvoidHand || event.wordHand;
+    } else if (dynamicMode === "avoid") {
+      const avoidHand = event.avoidHand || event.dynamicAvoidHand || event.wordHand || event.saidHand || event.predictedHand;
+      event.dynamicMode = "avoid";
+      event.avoidHand = avoidHand;
+      event.dynamicAvoidHand = avoidHand;
       event.resolvedPlayerHand = player;
 
-      if (player && player !== avoidHand) {
-        // 見せ手を外せたら、相手が合わせてくれる。
+      if (avoidHand && player && player !== avoidHand) {
+        // 見せ手を外せたら、必ず相手が合わせてあいこにする。
+        cpuHand = player;
+      } else if (avoidHand && player === avoidHand) {
+        // 見せ手に引っかかった時だけ、相手に取られる。
+        cpuHand = handThatBeats(player) || randomCpuHand();
+      } else if (player) {
+        // 念のため avoidHand が取れない場合も、理不尽なランダム勝敗にしない。
         cpuHand = player;
       } else {
-        // 見せ手に引っかかった時だけ、ちゃんと失敗としてメダルを取られる。
-        cpuHand = handThatBeats(player) || randomCpuHand();
+        cpuHand = randomCpuHand();
       }
 
       event.resolvedCpuHand = cpuHand;
     }
 
-    // このラウンドで使ったヒントの答えとして固定する。
-    // 次の入力待ちに入った時点で showNextInputPrompt() が新しい状態に更新する。
     state.debugAnswer = buildDebugAnswerFromPsychEvent(event, event.line || state.debugAnswer?.line || "");
     state.psychEvent = null;
     updateDebugAnswerPanel();
-    return cpuHand;
+    return cpuHand || randomCpuHand();
   }
 
   const drawAssistRate = getDrawAssistRate();
@@ -5410,6 +5421,9 @@ async function playRound(player) {
   clearPendingChoice();
   state.busy = true;
   const flowId = state.flowId;
+  // 表示中の心理イベントを、ラウンド開始時点で確実に確保する。
+  // resetRoundView() やキャラ更新の影響でイベントが消えても、このラウンドだけは同じ判定を使う。
+  const activePsychEvent = state.psychEvent ? { ...state.psychEvent } : null;
   state.finalConfirmHand = null;
   cabinet.classList.remove("is-final-confirm");
   stopChanceMessages();
@@ -5423,7 +5437,7 @@ async function playRound(player) {
   // 判定後ではなく、今回のラウンド開始時点のあいこ数で決める。
   const jankenTempo = getJankenTempo(state.draw);
   cabinet.dataset.tempoLevel = String(jankenTempo.level);
-  const cpu = chooseCpuHand(player);
+  const cpu = chooseCpuHand(player, activePsychEvent);
   const result = judge(player, cpu);
   const scoreChange = addRoundScore(result);
 
