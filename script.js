@@ -394,7 +394,7 @@ const CHOICE_BUFFER_MS = 900;
 
 const urlParams = new URLSearchParams(window.location.search);
 const DEBUG_MODE = urlParams.has("debug");
-const ASSET_VERSION = "20260613-guide-mirror-fix1";
+const ASSET_VERSION = "20260613-call3-bait-clear1";
 
 function assetPath(src) {
   if (!src || /^(?:data:|blob:|https?:)/.test(src) || src.includes("?v=")) {
@@ -529,8 +529,8 @@ const FEELING_LABELS = {
   },
   bait: {
     label: "きもち：ためす",
-    rule: "見せ手を外す",
-    hint: "見せた手以外なら合わせる",
+    rule: "見えた手を外す",
+    hint: "言った手は選ばない",
   },
   mirror: {
     label: "きもち：みてる",
@@ -1679,7 +1679,14 @@ const AudioManager = (() => {
 
   function playJankenCallSfx(fallbackType = "call1") {
     try {
-      if (muted || LOW_POWER_MODE) {
+      if (muted) {
+        return;
+      }
+
+      // BGMとケンカしないように、1拍目・2拍目は軽い電子音だけ。
+      // アップロードされた se_janken_call.mp3 は、ぽん！/しょ！ の3拍目だけに使う。
+      if (fallbackType !== "call3") {
+        playSound(fallbackType);
         return;
       }
 
@@ -1701,7 +1708,7 @@ const AudioManager = (() => {
       jankenCallSfxIndex += 1;
       audio.pause();
       audio.currentTime = 0;
-      audio.volume = fallbackType === "call3" ? 0.76 : 0.66;
+      audio.volume = 0.76;
       audio.play().catch(() => {
         playSound(fallbackType);
       });
@@ -2029,6 +2036,20 @@ function getNextTargetRoute(progress = getアルバムProgress()) {
 
 function isScoreAttackMode(progress = getアルバムProgress()) {
   return progress.trueEndSeen === true;
+}
+
+function getMatchBgmMode(progress = getアルバムProgress()) {
+  // じゃんけん中のBGMは、試合開始時にだけ決める。
+  // 途中でチャンスやファイナルに入っても曲は変えない。
+  if (!progress.normalWin) {
+    return "normal"; // 1回目の試合
+  }
+
+  if (!progress.chanceWin) {
+    return "chance"; // 2回目の試合
+  }
+
+  return "final"; // 3回目以降の試合、TRUE END後のスコアアタック
 }
 
 function isGalleryTrainingMode(progress = getアルバムProgress()) {
@@ -2991,11 +3012,11 @@ function routeHintLinesForCurrentTarget() {
   }
 
   if (targetRoute === "finalWin" || phase === "final" || phase === "near") {
-    return ["まよいは\nあとが本音", "ためすは\n見せた手を外す", "よく見れば\nまだ続くよ", "最後まで\nあわせられる？"];
+    return ["まよいは\n今の言葉", "ためすは\n見えた手を外す", "よく見れば\nまだ続くよ", "最後まで\nあわせられる？"];
   }
 
   if (targetRoute === "chanceWin" || phase === "aware" || phase === "read") {
-    return ["あわせたいは\n同じ手", "すなおは\nそのまま", "まよいは\nあとを見て", "あいこ、続けよう"];
+    return ["あわせたいは\n同じ手", "すなおは\nそのまま", "まよいは\n今を見て", "あいこ、続けよう"];
   }
 
   return [];
@@ -3279,9 +3300,9 @@ function formatDebugAnswer(answer = state.debugAnswer) {
       `セリフ：${line}`,
       `きもち：${feelingText}`,
       `読み方：${ruleText}`,
-      "本心：引っかからなければ合わせる",
-      `見せ手：${avoidName}`,
-      `成功：${avoidName}以外ならあいこ`,
+      "本心：見えた手を外したら合わせる",
+      `見えた手：${avoidName}`,
+      `成功：${avoidName}を選ばなければあいこ`,
       answer.resolvedPlayerHand ? `あなた：${playerName}` : "あなた：まだ未選択",
       answer.cpuHand ? `あいて：${cpuName}` : "あいて：選んだ手に合わせる",
     ].join("\n");
@@ -3532,8 +3553,9 @@ function lineTemplatesForCue(cue) {
 
   if (cue.feeling === "bait") {
     return [
-      `${word}っぽく\n見えるかな？`,
-      `${word}に\n見せてみるね`,
+      `${word}は\nひっかけだよ`,
+      `${word}に\n見えても外して`,
+      `${word}は\n選ばないで`,
     ];
   }
 
@@ -3773,7 +3795,7 @@ function createReadCue() {
     formulaText: dynamicMode === "mirror"
       ? "あなたの手＝あいての手"
       : dynamicMode === "avoid"
-        ? `${handName(avoidHand)}以外＝あいてが合わせる`
+        ? `${handName(avoidHand)}を外す＝あいてが合わせる`
         : dynamicMode === "sway"
           ? "今の言葉＝あいてが合わせる"
           : feeling === "panic"
@@ -4097,7 +4119,7 @@ async function showFinalJankenEntry() {
   setCharacter("excited");
   clearCinematicCutIn();
   AudioManager.playSound("chance");
-  AudioManager.switchBgm("final");
+  // 試合中にBGMは切り替えない。ファイナル突入も演出音だけで知らせる。
   showMessage("さいごのじゃんけん！", "is-result is-draw player-draw is-final-entry", {
     typewriter: true,
     maxDuration: 1250,
@@ -5574,7 +5596,7 @@ async function endGame(result) {
 function restartMatch() {
   AudioManager.unlockAudio();
   AudioManager.initAudio();
-  AudioManager.switchBgm("normal");
+  AudioManager.switchBgm(getMatchBgmMode());
   AudioManager.playSound("start");
   cancelEndFlow();
   clearCinematicCutIn();
@@ -5740,7 +5762,7 @@ async function startGame() {
   updateアルバムButton();
   window.setTimeout(() => {
     if (state.started && !state.ended) {
-      AudioManager.switchBgm("normal");
+      AudioManager.switchBgm(getMatchBgmMode());
     }
   }, 120);
   showIntroThenReady();
@@ -5864,7 +5886,7 @@ async function playRound(player) {
     setCharacter("excited");
     clearCinematicCutIn();
     AudioManager.playSound("chance");
-    AudioManager.switchBgm("chance");
+    // 試合中にBGMは切り替えない。演出音だけでチャンスを知らせる。
     showMessage(randomLine(CHANCE_ENTRY_LINES), "is-result is-draw player-draw is-chance-entry", { typewriter: true });
   } else if (scoreChange.warningStarted) {
     setCharacter("worried");
