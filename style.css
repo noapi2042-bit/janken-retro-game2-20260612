@@ -6,13 +6,13 @@
   --screen-green: #a8ff70;
   --screen-bg: #041207;
   --ink: #fff7d7;
-  --asset-cabinet-shell: url("assets/images/cabinet_shell.svg?v=20260612-mobile-perf1");
-  --asset-marquee-panel: url("assets/images/marquee_panel.svg?v=20260612-mobile-perf1");
-  --asset-bezel-frame: url("assets/images/bezel_frame.svg?v=20260612-mobile-perf1");
-  --asset-control-panel: url("assets/images/control_panel_base.svg?v=20260612-mobile-perf1");
-  --asset-button-plate-rock: url("assets/images/button_plate_rock.svg?v=20260612-mobile-perf1");
-  --asset-button-plate-scissors: url("assets/images/button_plate_scissors.svg?v=20260612-mobile-perf1");
-  --asset-button-plate-paper: url("assets/images/button_plate_paper.svg?v=20260612-mobile-perf1");
+  --asset-cabinet-shell: url("assets/images/cabinet_shell.svg?v=20260612-mobile-audit-fix2");
+  --asset-marquee-panel: url("assets/images/marquee_panel.svg?v=20260612-mobile-audit-fix2");
+  --asset-bezel-frame: url("assets/images/bezel_frame.svg?v=20260612-mobile-audit-fix2");
+  --asset-control-panel: url("assets/images/control_panel_base.svg?v=20260612-mobile-audit-fix2");
+  --asset-button-plate-rock: url("assets/images/button_plate_rock.svg?v=20260612-mobile-audit-fix2");
+  --asset-button-plate-scissors: url("assets/images/button_plate_scissors.svg?v=20260612-mobile-audit-fix2");
+  --asset-button-plate-paper: url("assets/images/button_plate_paper.svg?v=20260612-mobile-audit-fix2");
 }
 
 * {
@@ -4345,127 +4345,182 @@ html.is-lite-performance .choice.is-unselected,
 }
 
 
-/* ===== Mobile performance patch =====
-   iPhone / Android では見た目の豪華さより操作感を優先する。
-   ?full=1 または ?perf=full なら通常演出に戻せる。 */
-html.is-lite-performance body {
-  background: linear-gradient(135deg, #161313, #050505 70%) !important;
+/* ===== Mobile audit fix: SH-51C / iPhone safe performance layer ===== */
+html.is-lite-performance *,
+body.is-lite-performance * {
+  scroll-behavior: auto !important;
 }
 
 html.is-lite-performance .scanlines,
-html.is-lite-performance .crt::after,
-html.is-lite-performance .show-window::before,
-html.is-lite-performance .show-window::after,
 html.is-lite-performance .cabinet-art-rails,
 html.is-lite-performance .cabinet-art-screws,
+html.is-lite-performance .crt::after,
 html.is-lite-performance .bezel::after,
-html.is-lite-performance .marquee::after {
+html.is-lite-performance .marquee::after,
+html.is-lite-performance .show-window::before,
+html.is-lite-performance .show-window::after {
   display: none !important;
 }
 
-html.is-lite-performance .cabinet::after,
-html.is-lite-performance .cabinet::before,
-html.is-lite-performance .crt::before,
-html.is-lite-performance .bezel::before {
-  opacity: 0.18 !important;
-  mix-blend-mode: normal !important;
-}
-
 html.is-lite-performance .cabinet,
-html.is-lite-performance .cabinet-art-shell,
-html.is-lite-performance .marquee,
 html.is-lite-performance .bezel,
 html.is-lite-performance .crt,
 html.is-lite-performance .control-panel,
-html.is-lite-performance .character-frame,
-html.is-lite-performance .hand-card,
-html.is-lite-performance .scoreboard span,
+html.is-lite-performance .marquee,
 html.is-lite-performance .message,
+html.is-lite-performance .hand-card,
 html.is-lite-performance .choice,
+html.is-lite-performance .mood-badge,
 html.is-lite-performance .medal-record-hud {
+  box-shadow: none !important;
   filter: none !important;
-  text-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+html.is-lite-performance .cabinet::before,
+html.is-lite-performance .cabinet::after,
+html.is-lite-performance .bezel::before,
+html.is-lite-performance .marquee::before,
+html.is-lite-performance .message::after {
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+html.is-lite-performance .character-frame,
+html.is-lite-performance .character-frame img,
+html.is-lite-performance .hand-result-image,
+html.is-lite-performance .choice-hand-image,
+html.is-lite-performance .result-label,
+html.is-lite-performance .message,
+html.is-lite-performance .mood-badge {
+  animation: none !important;
+  transition: none !important;
   will-change: auto !important;
 }
 
-html.is-lite-performance .cabinet {
-  box-shadow:
-    inset 5px 0 10px rgba(255, 190, 112, 0.12),
-    inset -6px 0 12px rgba(33, 0, 0, 0.34),
-    0 0 0 3px #160606 !important;
+html.is-lite-performance .cabinet-art-shell {
+  opacity: 0.72 !important;
+  background-image:
+    var(--asset-cabinet-shell),
+    linear-gradient(#d84232, #74100f) !important;
 }
 
 html.is-lite-performance .crt {
-  box-shadow:
-    inset 0 0 18px rgba(0, 0, 0, 0.88),
-    0 0 0 2px #211917 !important;
+  background: #041207 !important;
+  border-width: 6px !important;
 }
 
-html.is-lite-performance .marquee,
-html.is-lite-performance .bezel,
-html.is-lite-performance .control-panel,
-html.is-lite-performance .character-frame,
-html.is-lite-performance .hand-card,
-html.is-lite-performance .choice,
+html.is-lite-performance .show-window {
+  padding-top: 76px !important;
+  padding-bottom: 46px !important;
+  min-height: min(68vw, 270px) !important;
+}
+
 html.is-lite-performance .message {
-  box-shadow: none !important;
+  top: 4px !important;
+  width: min(94%, 310px) !important;
+  min-height: 60px !important;
+  max-height: 86px !important;
+  padding: 8px 12px 10px !important;
+  border-width: 2px !important;
+  font-size: clamp(0.98rem, 4.4vw, 1.34rem) !important;
+  line-height: 1.15 !important;
+  text-shadow: 0 0 6px currentColor !important;
 }
 
-html.is-lite-performance .character-frame,
-html.is-lite-performance .show-window,
-html.is-lite-performance .hands,
-html.is-lite-performance .control-panel,
-html.is-lite-performance .choice-buttons,
-html.is-lite-performance .stage {
-  contain: layout paint;
+html.is-lite-performance .mood-badge {
+  bottom: 10px !important;
+  max-width: min(88%, 260px) !important;
+  padding: 4px 10px !important;
+  font-size: clamp(0.7rem, 3vw, 0.86rem) !important;
 }
 
-html.is-lite-performance .character-frame img,
-html.is-lite-performance .scene-illustration,
-html.is-lite-performance .gallery-preview img,
-html.is-lite-performance .choice-hand-image,
-html.is-lite-performance .hand-result-image {
-  filter: none !important;
-  will-change: auto !important;
-  transform-style: flat !important;
+html.is-lite-performance .mood-badge small {
+  font-size: 0.76em !important;
+}
+
+html.is-lite-performance .character-frame {
+  width: min(74vw, 270px) !important;
+  height: min(59vw, 218px) !important;
+  background: rgba(0, 0, 0, 0.08) !important;
 }
 
 html.is-lite-performance .character-frame img {
-  transition: none !important;
+  height: 132% !important;
+  max-height: 145% !important;
 }
 
-html.is-lite-performance .is-cinematic-cutin,
-html.is-lite-performance .cutin-psych,
-html.is-lite-performance .cutin-chance,
-html.is-lite-performance .cutin-final {
-  animation: none !important;
+html.is-lite-performance .hands {
+  min-height: 92px !important;
+  gap: 5px !important;
 }
 
-html.is-lite-performance .result-label,
-html.is-lite-performance .final-title,
-html.is-lite-performance .input-guide,
-html.is-lite-performance .mood-badge,
-html.is-lite-performance .score-pot,
-html.is-lite-performance .choice,
-html.is-lite-performance .hand-card,
-html.is-lite-performance .hand-result-image,
-html.is-lite-performance .choice-hand-image {
-  animation: none !important;
+html.is-lite-performance .hand-card {
+  min-height: 88px !important;
+  padding: 6px 5px 7px !important;
+  border-width: 2px !important;
 }
 
-@media (pointer: coarse), (prefers-reduced-motion: reduce) {
-  html:not(.is-full-performance) .scanlines,
-  html:not(.is-full-performance) .crt::after,
-  html:not(.is-full-performance) .show-window::before,
-  html:not(.is-full-performance) .show-window::after,
-  html:not(.is-full-performance) .cabinet-art-rails,
-  html:not(.is-full-performance) .cabinet-art-screws,
-  html:not(.is-full-performance) .bezel::after {
-    display: none !important;
+html.is-lite-performance .hand-card strong,
+html.is-lite-performance .hand-card strong.has-hand-image {
+  min-height: 58px !important;
+}
+
+html.is-lite-performance .hand-result-image {
+  width: clamp(54px, 14vw, 72px) !important;
+  height: clamp(54px, 14vw, 72px) !important;
+  filter: none !important;
+}
+
+html.is-lite-performance .choice {
+  min-height: 78px !important;
+}
+
+html.is-lite-performance .choice-icon {
+  width: 48px !important;
+  height: 48px !important;
+}
+
+html.is-lite-performance .scoreboard span {
+  min-height: 42px !important;
+  padding: 5px 3px !important;
+}
+
+html.is-lite-performance .scoreboard {
+  gap: 5px !important;
+}
+
+html.is-lite-performance .medal-record-hud:not(.is-score-attack) {
+  display: none !important;
+}
+
+@media (max-height: 720px) {
+  html.is-lite-performance .show-window {
+    padding-top: 66px !important;
+    padding-bottom: 40px !important;
+    min-height: 210px !important;
   }
 
-  html:not(.is-full-performance) * {
-    -webkit-font-smoothing: antialiased;
+  html.is-lite-performance .message {
+    min-height: 54px !important;
+    max-height: 74px !important;
+    font-size: clamp(0.88rem, 4vw, 1.16rem) !important;
+  }
+
+  html.is-lite-performance .character-frame {
+    width: min(68vw, 238px) !important;
+    height: min(52vw, 190px) !important;
+  }
+
+  html.is-lite-performance .mood-badge {
+    bottom: 6px !important;
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
