@@ -5363,7 +5363,7 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 }
 
 
-/* ===== 20260613-panic-complete-run1: aiko communication rules ===== */
+/* ===== 20260613-guide-mirror-fix1: aiko communication rules ===== */
 .cabinet.is-cue-focus .message {
   border-color: rgba(170, 255, 220, 0.96) !important;
   color: #eafff7 !important;
@@ -5379,7 +5379,7 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 }
 
 
-/* ===== 20260613-panic-complete-run1: HARD mobile layout reset ===== */
+/* ===== 20260613-guide-mirror-fix1: HARD mobile layout reset ===== */
 
 /* スマホでは、上の進行チップとセリフ枠を絶対に重ねない */
 #medalRecordHud {
@@ -5584,7 +5584,7 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 }
 
 
-/* ===== 20260613-panic-complete-run1: clean mobile UI without overlapping progress chips ===== */
+/* ===== 20260613-guide-mirror-fix1: clean mobile UI without overlapping progress chips ===== */
 
 /* 進行チップがセリフ枠に重なり続けたため、通常画面から外す。
    目的・あいこ・チャンス情報は、セリフとスコア表示で伝える。 */
@@ -5701,7 +5701,7 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 }
 
 
-/* ===== 20260613-panic-complete-run1: special cue notice / moving hesitation ===== */
+/* ===== 20260613-guide-mirror-fix1: special cue notice / moving hesitation ===== */
 
 .cabinet.is-cue-special .show-window::before {
   opacity: 1 !important;
@@ -5782,7 +5782,7 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 }
 
 
-/* ===== 20260613-panic-complete-run1: panic pre-reveal + complete run ===== */
+/* ===== 20260613-guide-mirror-fix1: panic pre-reveal + complete run ===== */
 
 .hand-card.is-pre-revealed {
   border-color: rgba(255, 238, 98, 0.98) !important;

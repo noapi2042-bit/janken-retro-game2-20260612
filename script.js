@@ -394,7 +394,7 @@ const CHOICE_BUFFER_MS = 900;
 
 const urlParams = new URLSearchParams(window.location.search);
 const DEBUG_MODE = urlParams.has("debug");
-const ASSET_VERSION = "20260613-panic-complete-run1";
+const ASSET_VERSION = "20260613-guide-mirror-fix1";
 
 function assetPath(src) {
   if (!src || /^(?:data:|blob:|https?:)/.test(src) || src.includes("?v=")) {
@@ -3012,6 +3012,31 @@ function postTrueStartLine() {
   return "今度は勝負じゃなくて、\nどこまでメダルを伸ばせるかな？";
 }
 
+
+function createGuideMirrorCue(line = "まずは練習。\n同じ手であいこ") {
+  return {
+    relationshipIntent: RELATIONSHIP_INTENT,
+    type: "mirror",
+    feeling: "mirror",
+    feelingLabel: FEELING_LABELS.mirror.label,
+    ruleText: "あなたに合わせる",
+    formulaText: "あなたの手＝あいての手",
+    cpuHand: null,
+    wordHand: null,
+    saidHand: null,
+    predictedHand: null,
+    requestedHand: null,
+    avoidHand: null,
+    dynamicAvoidHand: null,
+    dynamicMode: "mirror",
+    imageMood: "happy",
+    mood: "happy",
+    honest: true,
+    presentation: "guide",
+    line,
+  };
+}
+
 function showPostTrueStartMessage() {
   if (!getアルバムProgress().trueEndSeen || state.postTrueRecordAnnounced) {
     return false;
@@ -3034,11 +3059,19 @@ function showHintGuideMessage() {
   }
 
   saveHintGuideSeen();
-  setCharacter("happy", "match");
-  showMessage("まずは練習。\n同じ手であいこ", undefined, {
+
+  // ここはただの説明文ではなく、実際に「相手が合わせる」約束として扱う。
+  // 以前は psychEvent を作っていなかったため、この文の直後でも通常じゃんけんになり、
+  // 別の手を出されることがあった。
+  const cue = createGuideMirrorCue("まずは練習。\n同じ手であいこ");
+  state.psychEvent = cue;
+  setCharacter("happy", "mirror", cue);
+  setDebugAnswerFromPsychEvent(cue, cue.line);
+  showMessage(cue.line, "is-cue-focus", {
     typewriter: true,
-    maxDuration: 980,
+    maxDuration: 1280,
   });
+  markReadCueDifficulty(cue);
   return true;
 }
 
