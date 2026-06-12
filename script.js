@@ -33,6 +33,261 @@ const characterImages = {
   lose: [...characterVariants("worried", 6), ...characterVariants("panic", 6)],
 };
 
+
+const CHARACTER_POSE_META = {
+  normal: [
+    { hand: "neutral", vibe: "calm" },
+    { hand: "neutral", vibe: "gentle" },
+    { hand: "neutral", vibe: "quiet" },
+    { hand: "paper", vibe: "open" },
+    { hand: "neutral", vibe: "thinking" },
+    { hand: "paper", vibe: "wave" },
+  ],
+  draw: [
+    { hand: "neutral", vibe: "soft" },
+    { hand: "paper", vibe: "invite" },
+    { hand: "neutral", vibe: "secret" },
+  ],
+  happy: [
+    { hand: "neutral", vibe: "sweet" },
+    { hand: "neutral", vibe: "up" },
+    { hand: "neutral", vibe: "cheer" },
+    { hand: "neutral", vibe: "close" },
+    { hand: "paper", vibe: "welcome" },
+    { hand: "scissors", vibe: "sign" },
+  ],
+  smug: [
+    { hand: "paper", vibe: "show" },
+    { hand: "neutral", vibe: "thinking" },
+    { hand: "neutral", vibe: "quiet" },
+    { hand: "neutral", vibe: "pose" },
+    { hand: "neutral", vibe: "tease" },
+    { hand: "paper", vibe: "shrug" },
+  ],
+  worried: [
+    { hand: "neutral", vibe: "prayer" },
+    { hand: "neutral", vibe: "shy" },
+    { hand: "neutral", vibe: "uneasy" },
+    { hand: "neutral", vibe: "heart" },
+    { hand: "neutral", vibe: "small" },
+    { hand: "neutral", vibe: "quiet" },
+  ],
+  panic: [
+    { hand: "paper", vibe: "shock" },
+    { hand: "paper", vibe: "rush" },
+    { hand: "neutral", vibe: "flustered" },
+    { hand: "neutral", vibe: "uneasy" },
+    { hand: "paper", vibe: "wide" },
+    { hand: "paper", vibe: "wide" },
+  ],
+  excited: [
+    { hand: "neutral", vibe: "spark" },
+    { hand: "rock", vibe: "pump" },
+    { hand: "paper", vibe: "reach" },
+    { hand: "paper", vibe: "welcome" },
+    { hand: "rock", vibe: "pump" },
+    { hand: "neutral", vibe: "call" },
+  ],
+  shocked: [
+    { hand: "neutral", vibe: "surprised" },
+    { hand: "neutral", vibe: "gasp" },
+    { hand: "neutral", vibe: "taken" },
+    { hand: "neutral", vibe: "stunned" },
+  ],
+  win: [
+    { hand: "neutral", vibe: "sweet" },
+    { hand: "neutral", vibe: "up" },
+    { hand: "neutral", vibe: "cheer" },
+    { hand: "neutral", vibe: "close" },
+    { hand: "paper", vibe: "welcome" },
+    { hand: "scissors", vibe: "sign" },
+  ],
+  lose: [
+    { hand: "neutral", vibe: "prayer" },
+    { hand: "neutral", vibe: "shy" },
+    { hand: "neutral", vibe: "uneasy" },
+    { hand: "neutral", vibe: "heart" },
+    { hand: "neutral", vibe: "small" },
+    { hand: "neutral", vibe: "quiet" },
+  ],
+};
+
+const CHARACTER_SHOT_PRESETS = {
+  calm: [
+    { shot: "mid", height: 146, scale: 1.00, x: 0, y: -3, rot: 0 },
+    { shot: "close-left", height: 152, scale: 1.06, x: -10, y: -7, rot: -2.2 },
+    { shot: "close-right", height: 152, scale: 1.06, x: 10, y: -7, rot: 2.2 },
+  ],
+  gentle: [
+    { shot: "close-left", height: 156, scale: 1.10, x: -12, y: -9, rot: -2.8 },
+    { shot: "close-right", height: 156, scale: 1.10, x: 10, y: -8, rot: 2.0 },
+    { shot: "mid", height: 150, scale: 1.02, x: 0, y: -4, rot: 0 },
+  ],
+  excited: [
+    { shot: "close-left", height: 162, scale: 1.12, x: -8, y: -8, rot: -1.8 },
+    { shot: "close-right", height: 162, scale: 1.12, x: 8, y: -8, rot: 1.8 },
+    { shot: "mid", height: 156, scale: 1.04, x: 0, y: -4, rot: 0 },
+  ],
+  panic: [
+    { shot: "close-left", height: 160, scale: 1.11, x: -12, y: -7, rot: -3.2 },
+    { shot: "close-right", height: 160, scale: 1.11, x: 12, y: -7, rot: 3.2 },
+    { shot: "mid", height: 154, scale: 1.05, x: 0, y: -3, rot: 0 },
+  ],
+  smug: [
+    { shot: "close-left", height: 158, scale: 1.12, x: -14, y: -8, rot: -2.4 },
+    { shot: "close-right", height: 158, scale: 1.12, x: 12, y: -8, rot: 2.4 },
+    { shot: "mid", height: 152, scale: 1.04, x: 0, y: -4, rot: 0 },
+  ],
+};
+
+function characterPoseMetaFor(mood, index) {
+  const list = CHARACTER_POSE_META[mood] || CHARACTER_POSE_META.normal;
+  return list[index - 1] || { hand: "neutral", vibe: "calm" };
+}
+
+function characterEntriesForMood(mood) {
+  const characterMood = characterImages[mood] ? mood : "normal";
+  return normalizeImageGroups(characterImages[characterMood]).map((sources, index) => ({
+    mood: characterMood,
+    index: index + 1,
+    sources,
+    meta: characterPoseMetaFor(characterMood, index + 1),
+  }));
+}
+
+function randomFromList(list) {
+  if (!list || !list.length) {
+    return null;
+  }
+  return list[Math.floor(Math.random() * list.length)] || list[0] || null;
+}
+
+function scoreCharacterEntry(entry, context = null) {
+  const meta = entry.meta || {};
+  const shownHand = meta.hand || "neutral";
+  let score = Math.random() * 0.35;
+
+  if (meta.vibe === "close" || meta.vibe === "welcome" || meta.vibe === "reach") {
+    score += 0.4;
+  }
+
+  if (!context) {
+    return score;
+  }
+
+  const feeling = context.feeling || "";
+  const targetHand = context.targetVisualHand || context.cpuHand || null;
+  const fakeHand = context.wordHand || null;
+
+  if (["match", "honest", "panic", "trueEnd"].includes(feeling)) {
+    if (shownHand === targetHand) {
+      score += 9;
+    } else if (shownHand === "neutral") {
+      score += 4;
+    } else {
+      score -= 0.8;
+    }
+  } else if (feeling === "bait") {
+    if (shownHand === fakeHand) {
+      score += 9;
+    } else if (shownHand === "neutral") {
+      score += 3.6;
+    } else if (shownHand === targetHand) {
+      score += 0.8;
+    }
+  } else if (feeling === "hide") {
+    if (shownHand === "neutral") {
+      score += 8.2;
+    } else {
+      score -= 1.8;
+    }
+  } else if (feeling === "hesitate") {
+    if (shownHand === "neutral") {
+      score += 6.2;
+    }
+    if (shownHand === fakeHand || shownHand === targetHand) {
+      score += 2.1;
+    }
+  }
+
+  if (context.preferCloseUp) {
+    score += meta.vibe === "close" ? 1.6 : 0.4;
+  }
+
+  return score;
+}
+
+function orderedSourcesForEntries(entries) {
+  return uniqueImageSources(entries.flatMap((entry) => entry.sources || []));
+}
+
+function shotPresetBucketForMood(mood, context = null) {
+  if (context && (context.feeling === "panic" || mood === "panic" || mood === "shocked")) {
+    return CHARACTER_SHOT_PRESETS.panic;
+  }
+
+  if (mood === "excited" || mood === "draw") {
+    return CHARACTER_SHOT_PRESETS.excited;
+  }
+
+  if (mood === "smug") {
+    return CHARACTER_SHOT_PRESETS.smug;
+  }
+
+  if (mood === "happy" || mood === "win") {
+    return CHARACTER_SHOT_PRESETS.gentle;
+  }
+
+  return CHARACTER_SHOT_PRESETS.calm;
+}
+
+function chooseCharacterPresentation(mood, context = null) {
+  const entries = characterEntriesForMood(mood);
+  if (!entries.length) {
+    return {
+      sources: commonCharacterFallbackSources(),
+      meta: { hand: "neutral", vibe: "calm" },
+      shot: randomFromList(CHARACTER_SHOT_PRESETS.calm),
+    };
+  }
+
+  const ranked = entries
+    .map((entry) => ({ ...entry, _score: scoreCharacterEntry(entry, context) }))
+    .sort((a, b) => b._score - a._score);
+
+  const picked = ranked[0] || entries[0];
+  const others = ranked.filter((entry) => entry !== picked);
+  const shot = randomFromList(shotPresetBucketForMood(picked.mood, context)) || randomFromList(CHARACTER_SHOT_PRESETS.calm);
+
+  return {
+    entry: picked,
+    meta: picked.meta,
+    shot,
+    sources: uniqueImageSources([
+      ...(picked.sources || []),
+      ...orderedSourcesForEntries(others),
+      ...commonCharacterFallbackSources(),
+    ]),
+  };
+}
+
+function applyCharacterPresentation(presentation) {
+  if (!characterFrame) {
+    return;
+  }
+
+  const shot = presentation?.shot || {};
+  const meta = presentation?.meta || {};
+
+  characterFrame.dataset.shot = shot.shot || "mid";
+  characterFrame.dataset.poseHand = meta.hand || "neutral";
+  characterFrame.style.setProperty("--char-height", `${shot.height || 152}%`);
+  characterFrame.style.setProperty("--char-scale", `${shot.scale || 1}`);
+  characterFrame.style.setProperty("--char-x", `${shot.x || 0}px`);
+  characterFrame.style.setProperty("--char-y", `${shot.y || 0}px`);
+  characterFrame.style.setProperty("--char-rot", `${shot.rot || 0}deg`);
+}
+
 const sceneImages = {
   intro: "assets/images/scene_intro.png",
   playerWin: "assets/images/scene_player_win.png",
@@ -125,7 +380,7 @@ const CHOICE_BUFFER_MS = 900;
 
 const urlParams = new URLSearchParams(window.location.search);
 const DEBUG_MODE = urlParams.has("debug");
-const ASSET_VERSION = "20260613-tempo-image-rule1";
+const ASSET_VERSION = "20260613-presentation-polish1";
 
 function assetPath(src) {
   if (!src || /^(?:data:|blob:|https?:)/.test(src) || src.includes("?v=")) {
@@ -2457,38 +2712,46 @@ function updateAikoGuideHud() {
   const progress = getアルバムProgress();
   const phaseText = phaseTextForHud();
 
-  if (phaseLabel) {
-    phaseLabel.textContent = `いま：${phaseText}`;
-  }
-
+  // スマホで横に潰れないように、短い3つのチップ表示にする。
+  // 長い説明はメッセージ側に任せ、ここは現在地と目標だけを見せる。
   if (!progress.normalWin && !progress.trueEndSeen) {
+    if (phaseLabel) {
+      phaseLabel.textContent = "ふつう";
+    }
     if (nextChanceLabel) {
-      nextChanceLabel.textContent = `目標：30まいで勝ち`;
+      nextChanceLabel.textContent = `あいこ${formatScoreValue(draw)}`;
     }
     if (nextFinalLabel) {
-      nextFinalLabel.textContent = `勝つとメダルをもらう`;
+      nextFinalLabel.textContent = "目標30";
     }
   } else if (progress.trueEndSeen) {
+    if (phaseLabel) {
+      phaseLabel.textContent = "スコア";
+    }
     if (nextChanceLabel) {
-      nextChanceLabel.textContent = `あいこ ${formatScoreValue(draw)}回`;
+      nextChanceLabel.textContent = `あいこ${formatScoreValue(draw)}`;
     }
     if (nextFinalLabel) {
-      nextFinalLabel.textContent = "どこまで続く？";
+      nextFinalLabel.textContent = "記録へ";
     }
   } else {
+    if (phaseLabel) {
+      phaseLabel.textContent = phaseText;
+    }
     if (nextChanceLabel) {
       nextChanceLabel.textContent = state.chance || draw >= chanceCount
         ? "チャンス中"
-        : `チャンスまで あと${chanceRemain}`;
+        : `チャンスあと${chanceRemain}`;
     }
 
     if (nextFinalLabel) {
       nextFinalLabel.textContent = state.finalJanken || draw >= finalCount
-        ? "さいごはノーヒント"
-        : `さいごまで あと${finalRemain}`;
+        ? "ノーヒント"
+        : `さいごあと${finalRemain}`;
     }
   }
 
+  aikoGuideHud.classList.toggle("is-normal-phase", !progress.normalWin && !progress.trueEndSeen);
   aikoGuideHud.classList.toggle("is-chance", state.chance && !state.finalJanken);
   aikoGuideHud.classList.toggle("is-final", state.finalJanken);
   aikoGuideHud.classList.toggle("is-score-attack", progress.trueEndSeen === true);
@@ -3009,8 +3272,8 @@ function lineTemplatesForCue(cue) {
   const word = handName(cue.wordHand);
   const cpu = handName(cue.cpuHand);
 
-  // 本心は「勝負で終わり」より「もう少し続けたい」。
-  // ためす・ないしょも、悪意ではなく照れや試し行動として読ませる。
+  // 画像で見えている雰囲気と、セリフの意図がズレにくい短文に寄せる。
+  // 基本は「まだ続けたい」が本心で、その中で見せ方だけを少し変える。
   if (cue.feeling === "match") {
     return [
       `${cpu}で
@@ -3022,18 +3285,18 @@ function lineTemplatesForCue(cue) {
 
   if (cue.feeling === "bait") {
     return [
-      `${word}に
+      `${word}っぽく
 見えるかな？`,
-      `${word}って
-思った？`,
+      `${word}に
+見せてみるね`,
     ];
   }
 
   if (cue.feeling === "hide") {
     return [
-      `ないしょは
-${cpu}だよ`,
-      `${cpu}だけ
+      `ほんとは
+${cpu}で続きたい`,
+      `${cpu}を
 小さく言うね`,
     ];
   }
@@ -3041,16 +3304,16 @@ ${cpu}だよ`,
   if (cue.feeling === "hesitate") {
     return [
       `${word}かな…
-やっぱ${cpu}`,
+でも${cpu}`,
       `${word}…
-ううん${cpu}`,
+やっぱ${cpu}`,
     ];
   }
 
   if (cue.feeling === "panic") {
     return [
       `あっ…
-${cpu}って言っちゃった`,
+${cpu}で合わせたい`,
       `ほんとは
 ${cpu}だよ`,
     ];
@@ -3305,7 +3568,7 @@ function maybeStartPsychEvent(force = false) {
   const cue = createReadCue();
   state.psychEvent = cue;
 
-  setCharacter(cue.imageMood || cue.mood || "normal", cue.feeling);
+  setCharacter(cue.imageMood || cue.mood || "normal", cue.feeling, cue);
   clearCinematicCutIn();
   const line = psychEventLine(state.psychEvent);
   setDebugAnswerFromPsychEvent(state.psychEvent, line);
@@ -3886,7 +4149,7 @@ function setMoodBadge(mood) {
   moodBadge.dataset.rule = rule ? "show" : "hide";
 }
 
-function setCharacter(mood, feeling = null) {
+function setCharacter(mood, feeling = null, context = null) {
   const characterMood = characterImages[mood] ? mood : "normal";
   state.currentFeeling = feeling;
   const requestId = ++characterRequestId;
@@ -3894,10 +4157,13 @@ function setCharacter(mood, feeling = null) {
   characterFrame.dataset.mood = characterMood;
   setMoodBadge(characterMood);
 
+  const presentation = chooseCharacterPresentation(characterMood, context);
+  applyCharacterPresentation(presentation);
+
   loadImageDirectlyWithFallback(
     characterImage,
     characterFallback,
-    characterSourcesForMood(characterMood),
+    presentation.sources,
     {
       priority: "high",
       isCurrent: () => requestId === characterRequestId,
@@ -4003,9 +4269,8 @@ function loadImageDirectlyWithFallback(imgElement, fallbackElement, sources, opt
 }
 
 function characterSourcesForMood(mood) {
-  const characterMood = characterImages[mood] ? mood : "normal";
-  const moodSources = shuffledImageGroups(characterImages[characterMood]).flatMap((group) => group);
-  return uniqueImageSources([...moodSources, ...commonCharacterFallbackSources()]);
+  const presentation = chooseCharacterPresentation(mood, null);
+  return uniqueImageSources([...(presentation.sources || []), ...commonCharacterFallbackSources()]);
 }
 
 function showLoadedCharacterImage(imgElement, fallbackElement, src, priority = "high") {
