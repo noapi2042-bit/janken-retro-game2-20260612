@@ -530,6 +530,10 @@ let pendingChoiceHand = null;
 let pendingChoiceAt = 0;
 let pendingChoiceTimer = null;
 let psychCueMessageTimer = null;
+let scoreAttackTimerTick = null;
+let scoreAttackTimerTimeout = null;
+let scoreAttackTimerDeadline = 0;
+let scoreAttackTimerLimitSeconds = 0;
 let lastSpecialCueSignalAt = 0;
 
 const CHOICE_POINTER_ACTIVATION_SUPPRESS_MS = 420;
@@ -538,7 +542,7 @@ const CHOICE_BUFFER_MS = 900;
 
 const urlParams = new URLSearchParams(window.location.search);
 const DEBUG_MODE = urlParams.has("debug");
-const ASSET_VERSION = "20260613-data-audit-clean1";
+const ASSET_VERSION = "20260613-score-attack-timer1";
 
 function assetPath(src) {
   if (!src || /^(?:data:|blob:|https?:)/.test(src) || src.includes("?v=")) {
@@ -628,6 +632,7 @@ const DRAW_WARNING_COUNT = 5;
 const CHANCE_DRAW_COUNT = 10;
 const FINAL_DRAW_COUNT = 15;
 const POST_TRUE_COMPLETE_DRAW_COUNT = 100;
+const SCORE_ATTACK_MAX_LEVEL = 100;
 const CHANCE_MESSAGES = ["メダル大！", "ねらって！", "あわせる？", "まだいける！"];
 const INTRO_LINES = ["よろしくね！", "じゃんけんしよ♪", "てをえらんでね", "はじめるよ！", "あいこ、できる？"];
 const CHANCE_ENTRY_LINES = ["チャンスタイム！", "あいこ成功！", "メダル大！", "ここからチャンス"];
@@ -899,11 +904,38 @@ function normalizeScoreValue(value) {
 function formatScoreValue(value) {
   const score = normalizeScoreValue(value);
 
-  if (score >= 1000000000000000) {
-    return score.toExponential(3).replace("e+", "e");
+  if (score < 10000) {
+    return String(score);
   }
 
-  return score.toLocaleString("ja-JP");
+  // スコアアタックではメダルが急激に増えるため、枠に収まる和風単位で短縮する。
+  // 例：83886080 → 8389万、838860800 → 8.39億
+  const units = ["", "万", "億", "兆", "京", "垓", "秭", "穣", "溝", "澗"];
+  const unitIndex = Math.max(1, Math.min(units.length - 1, Math.floor(Math.log10(score) / 4)));
+  const scaled = score / (10 ** (unitIndex * 4));
+  let digits;
+
+  if (scaled >= 1000) {
+    digits = String(Math.round(scaled));
+  } else if (scaled >= 100) {
+    digits = String(Math.round(scaled));
+  } else if (scaled >= 10) {
+    digits = scaled.toFixed(1);
+  } else {
+    digits = scaled.toFixed(2);
+  }
+
+  digits = digits.replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
+
+  // 画面上の小さい枠に入れるため、長すぎる場合は少し丸める。
+  if (digits.length > 4 && digits.includes(".")) {
+    digits = String(Math.round(scaled));
+  }
+  if (digits.length > 4) {
+    digits = Number(scaled).toPrecision(3).replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
+  }
+
+  return `${digits}${units[unitIndex]}`;
 }
 
 function loadBestMedalRecord() {
@@ -958,21 +990,29 @@ function maybeUpdateBestMedalRecord(value) {
 }
 
 function getScoreTier() {
-  // メダル額ではなく、あいこ継続数で難度を上げる。
-  // 30回を超えたあたりはまだ読みやすく、60〜100回の間でたまにだけキワドイ読みを出す。
-  if (state.draw >= 100) {
+  const level = getScoreAttackLevel();
+
+  if (level >= 90) {
+    return 6;
+  }
+
+  if (level >= 75) {
+    return 5;
+  }
+
+  if (level >= 55) {
     return 4;
   }
 
-  if (state.draw >= 80) {
+  if (level >= 35) {
     return 3;
   }
 
-  if (state.draw >= 60) {
+  if (level >= 16) {
     return 2;
   }
 
-  if (state.draw >= 40) {
+  if (level >= 8) {
     return 1;
   }
 
@@ -1106,8 +1146,11 @@ const state = {
   medalNewRecordValue: 0,
   currentFeeling: null,
   lastLine: "",
+  lastMissHint: null,
   flowId: 0,
   feelingCueSeen: {},
+  scoreAttackHandHistory: [],
+  scoreAttackFeelingHistory: [],
 };
 
 const cabinet = document.querySelector(".cabinet");
@@ -1154,6 +1197,9 @@ const aikoGuideHud = document.querySelector("#aikoGuideHud");
 const phaseLabel = document.querySelector("#phaseLabel");
 const nextChanceLabel = document.querySelector("#nextChanceLabel");
 const nextFinalLabel = document.querySelector("#nextFinalLabel");
+const scoreAttackTimer = document.querySelector("#scoreAttackTimer");
+const scoreAttackTimerLabel = document.querySelector("#scoreAttackTimerLabel");
+const scoreAttackTimerValue = document.querySelector("#scoreAttackTimerValue");
 const characterFrame = document.querySelector(".character-frame");
 const characterImage = document.querySelector("#characterImage");
 const characterFallback = document.querySelector("#characterFallback");
@@ -1241,6 +1287,23 @@ const KEYBOARD_HAND_MAP = {
 
 function getJankenTempoLevel(drawValue = state.draw) {
   const draw = Math.max(0, Number(drawValue || 0));
+
+  if (isScoreAttackMode()) {
+    const level = getScoreAttackLevel(draw);
+    if (level >= 85) {
+      return 4;
+    }
+    if (level >= 55) {
+      return 3;
+    }
+    if (level >= 30) {
+      return 2;
+    }
+    if (level >= 12) {
+      return 1;
+    }
+    return 0;
+  }
 
   if (draw >= 30) {
     return 4;
@@ -2057,6 +2120,9 @@ function setButtonsEnabled(enabled) {
   if (enabled && state.started && !state.busy && !state.ended) {
     // 入力待ちになった時刻を記録。長時間放置後の音声復帰・タイマーずれ対策に使う。
     lastInputReadyAt = performance.now();
+    startScoreAttackTimer();
+  } else {
+    stopScoreAttackTimer();
   }
   choiceButtons.forEach((button) => {
     const shouldDisableElement = !enabled && !state.started;
@@ -2958,13 +3024,17 @@ function updateAikoGuideHud() {
 function updateScore() {
   const previousPotText = potCount?.textContent;
   winCount.textContent = formatScoreValue(state.win);
+  winCount.title = String(normalizeScoreValue(state.win));
   loseCount.textContent = formatScoreValue(state.lose);
+  loseCount.title = String(normalizeScoreValue(state.lose));
   if (drawCount) {
     drawCount.textContent = formatScoreValue(state.draw);
+    drawCount.title = String(normalizeScoreValue(state.draw));
   }
   if (potCount) {
     const potText = formatScoreValue(state.pot);
     potCount.textContent = potText;
+    potCount.title = String(normalizeScoreValue(state.pot));
     const potBox = potCount.closest(".score-pot");
     if (previousPotText && previousPotText !== potText) {
       restartClassAnimation(potBox, "is-medal-up");
@@ -3024,7 +3094,8 @@ function setStageMood(mood) {
     "is-cue-caution",
     "is-cue-focus",
     "is-cue-special",
-    "is-cue-sway"
+    "is-cue-sway",
+    "is-score-level"
   );
 
   if (mood) {
@@ -3160,7 +3231,14 @@ function routeHintLinesForCurrentTarget() {
   const targetRoute = getNextTargetRoute();
 
   if (phase === "afterTrueEnd") {
-    return ["また同じ手、出せるかな。", "今度は勝負じゃなくてもいいよ。", "手、見なくてもわかるかも。", "また、あいこから始めよ？"];
+    const status = scoreAttackStatusLine();
+    return [
+      status,
+      scoreAttackFlavorLine(),
+      scoreAttackTimerRuleLine(),
+      "時間切れなら\nメダルをもらうね",
+      "LVが上がるほど\n待てる時間も短いよ",
+    ];
   }
 
   if (targetRoute === "finalWin" || phase === "final" || phase === "near") {
@@ -3177,12 +3255,16 @@ function routeHintLinesForCurrentTarget() {
 function postTrueStartLine() {
   const record = getPostTrueDrawRecord();
   const medalRecord = getBestMedalRecord();
+  const status = scoreAttackStatusLine(0);
+  const rule = scoreAttackTimerRuleLine(0);
 
   if (record > 0 || medalRecord > 0) {
-    return `きろく ${formatScoreValue(medalRecord)} メダル\n今日は超えられるかな？`;
+    return `${status}
+${rule}`;
   }
 
-  return "今度は勝負じゃなくて、\nどこまでメダルを伸ばせるかな？";
+  return `${status}
+${rule}`;
 }
 
 
@@ -3266,21 +3348,26 @@ function checkPostTrueDrawRecord() {
 }
 
 function postTrueNewRecordLine() {
-  const currentDraws = state.draw;
+  const level = getScoreAttackLevel();
+  const stage = scoreAttackStageForLevel(level);
 
-  if (currentDraws >= 20) {
-    return `すごい……${currentDraws}回目。\nもう言わなくても合うね。`;
+  if (level >= 80) {
+    return `新記録 LV ${level}
+${scoreAttackFlavorLine()}`;
   }
 
-  if (currentDraws >= 15) {
-    return `${currentDraws}回目のあいこ……\nまだ一緒にいられるね。`;
+  if (level >= 45) {
+    return `LV ${level} ${stage.name}
+記録が沈んでいくね`;
   }
 
-  if (currentDraws >= 10) {
-    return `新記録、${currentDraws}回だよ。\n気持ち、合ってきたね。`;
+  if (level >= 20) {
+    return `LV ${level} ${stage.name}
+記録更新だよ`;
   }
 
-  return `新記録！ ${currentDraws}回目のあいこだよ。`;
+  return `新記録 LV ${level}
+まだ伸ばせるね`;
 }
 
 function medalNewRecordLine(scoreChange) {
@@ -3335,6 +3422,370 @@ function medalForDrawCount(drawCount) {
   }
 
   return value;
+}
+
+function getScoreAttackLevel(drawValue = state.draw) {
+  // TRUE END後のスコアアタックは、あいこ継続数をそのままLVに近い形で扱う。
+  // 1から始まり、100で完走。
+  const draw = Math.max(0, Number(drawValue || 0));
+  return Math.max(1, Math.min(SCORE_ATTACK_MAX_LEVEL, draw + 1));
+}
+
+function scoreAttackStageForLevel(level = getScoreAttackLevel()) {
+  const lv = Math.max(1, Math.min(SCORE_ATTACK_MAX_LEVEL, Number(level) || 1));
+
+  if (lv >= 90) {
+    return { rank: 6, name: "禁域", mood: "shocked", tone: "last" };
+  }
+
+  if (lv >= 75) {
+    return { rank: 5, name: "狂熱", mood: "smug", tone: "mad" };
+  }
+
+  if (lv >= 55) {
+    return { rank: 4, name: "深層", mood: "smug", tone: "deep" };
+  }
+
+  if (lv >= 35) {
+    return { rank: 3, name: "陶酔", mood: "excited", tone: "heat" };
+  }
+
+  if (lv >= 16) {
+    return { rank: 2, name: "熱", mood: "happy", tone: "warm" };
+  }
+
+  return { rank: 1, name: "余熱", mood: "happy", tone: "soft" };
+}
+
+function scoreAttackStatusLine(drawValue = state.draw) {
+  const level = getScoreAttackLevel(drawValue);
+  const stage = scoreAttackStageForLevel(level);
+  return `LV ${level} / ${SCORE_ATTACK_MAX_LEVEL}\n${stage.name}`;
+}
+
+function scoreAttackTimeLimitSeconds(level = getScoreAttackLevel()) {
+  const lv = Math.max(1, Math.min(SCORE_ATTACK_MAX_LEVEL, Number(level) || 1));
+
+  if (lv >= 90) {
+    return 5;
+  }
+
+  if (lv >= 75) {
+    return 6;
+  }
+
+  if (lv >= 55) {
+    return 7;
+  }
+
+  if (lv >= 35) {
+    return 8;
+  }
+
+  if (lv >= 16) {
+    return 9;
+  }
+
+  return 10;
+}
+
+function scoreAttackTimerRuleLine(drawValue = state.draw) {
+  const level = getScoreAttackLevel(drawValue);
+  const seconds = scoreAttackTimeLimitSeconds(level);
+  return `${seconds}秒以内に\n手を選んでね`;
+}
+
+function hideScoreAttackTimer() {
+  if (scoreAttackTimer) {
+    scoreAttackTimer.hidden = true;
+    scoreAttackTimer.classList.remove("is-danger", "is-urgent");
+  }
+}
+
+function stopScoreAttackTimer(hide = true) {
+  if (scoreAttackTimerTick) {
+    window.clearInterval(scoreAttackTimerTick);
+    scoreAttackTimerTick = null;
+  }
+
+  if (scoreAttackTimerTimeout) {
+    window.clearTimeout(scoreAttackTimerTimeout);
+    scoreAttackTimerTimeout = null;
+  }
+
+  scoreAttackTimerDeadline = 0;
+  scoreAttackTimerLimitSeconds = 0;
+
+  if (hide) {
+    hideScoreAttackTimer();
+  }
+}
+
+function updateScoreAttackTimerDisplay() {
+  if (!scoreAttackTimer || !scoreAttackTimerValue || !scoreAttackTimerLabel || !scoreAttackTimerDeadline) {
+    return;
+  }
+
+  const msLeft = Math.max(0, scoreAttackTimerDeadline - performance.now());
+  const secondsLeft = Math.max(0, Math.ceil(msLeft / 1000));
+  const level = getScoreAttackLevel();
+  scoreAttackTimerValue.textContent = String(secondsLeft);
+  scoreAttackTimerLabel.textContent = `LV ${level} / TIME`;
+  scoreAttackTimer.hidden = false;
+  scoreAttackTimer.classList.toggle("is-danger", secondsLeft <= 3);
+  scoreAttackTimer.classList.toggle("is-urgent", secondsLeft <= 1);
+}
+
+function shouldRunScoreAttackTimer() {
+  return Boolean(
+    isScoreAttackMode() &&
+      state.started &&
+      !state.busy &&
+      !state.ended &&
+      !state.finalJanken &&
+      !isGameplayOverlayOpen()
+  );
+}
+
+function startScoreAttackTimer() {
+  stopScoreAttackTimer(false);
+
+  if (!shouldRunScoreAttackTimer()) {
+    hideScoreAttackTimer();
+    return;
+  }
+
+  const level = getScoreAttackLevel();
+  const seconds = scoreAttackTimeLimitSeconds(level);
+  scoreAttackTimerLimitSeconds = seconds;
+  scoreAttackTimerDeadline = performance.now() + seconds * 1000;
+  updateScoreAttackTimerDisplay();
+
+  scoreAttackTimerTick = window.setInterval(() => {
+    updateScoreAttackTimerDisplay();
+  }, 160);
+
+  scoreAttackTimerTimeout = window.setTimeout(() => {
+    handleScoreAttackTimeout();
+  }, seconds * 1000 + 80);
+}
+
+async function handleScoreAttackTimeout() {
+  if (!shouldRunScoreAttackTimer()) {
+    stopScoreAttackTimer();
+    return;
+  }
+
+  const flowId = state.flowId;
+  const level = getScoreAttackLevel();
+  const limit = scoreAttackTimerLimitSeconds || scoreAttackTimeLimitSeconds(level);
+  const payout = normalizeScoreValue(state.pot || BASE_メダル);
+
+  stopScoreAttackTimer();
+  clearPendingChoice();
+  stopPsychCueMotion();
+  cancelMessageTyping();
+  cancelClassAnimation(message, "is-sway-text-flow");
+  setSelectedButton();
+  setButtonsEnabled(false);
+  clearPreRevealedHands();
+
+  state.busy = true;
+  state.psychEvent = null;
+  state.lastMissHint = {
+    line: `LV ${level}で時間切れ\n${limit}秒以内に選んでね`,
+    feeling: "timeout",
+    player: null,
+    cpu: null,
+    result: "lose",
+  };
+
+  state.lose += payout;
+  state.pot = BASE_メダル;
+  state.draw = 0;
+  state.drawWarningShown = false;
+  state.finalConfirmHand = null;
+  updateScore();
+
+  renderHand(playerHand, null);
+  renderHand(cpuHand, null);
+  setCharacter(level >= 55 ? "smug" : "worried");
+  setResultLabel("lose", payout, false);
+  AudioManager.playSound("lose");
+  showMessage(`時間切れ\n${formatScoreValue(payout)}メダルを取られた`, "is-result is-win player-lose is-cue-caution", {
+    typewriter: true,
+    maxDuration: 1500,
+  });
+
+  await wait(1550);
+
+  if (flowId !== state.flowId) {
+    return;
+  }
+
+  state.busy = false;
+  endGame("lose");
+}
+
+function scoreAttackFlavorLine(drawValue = state.draw) {
+  const level = getScoreAttackLevel(drawValue);
+  const stage = scoreAttackStageForLevel(level);
+
+  if (stage.rank >= 6) {
+    return randomLine(["もう、音しか聞こえないね", "ここから先は、手元だけ見て", "5秒だけ、待つね"]);
+  }
+
+  if (stage.rank >= 5) {
+    return randomLine(["メダルの音、止まらないね", "まだ足りないって顔してる", "次も読めるよね？", "少し急がないとね"]);
+  }
+
+  if (stage.rank >= 4) {
+    return randomLine(["少しだけ、目が熱いね", "もう引き返せないかも", "メダル、深くなってきたね", "時間も薄くなってきたよ"]);
+  }
+
+  if (stage.rank >= 3) {
+    return randomLine(["いい音になってきたね", "もっと積めそうだね", "読み合い、濃くなってきたよ"]);
+  }
+
+  if (stage.rank >= 2) {
+    return randomLine(["少しずつ熱くなるよ", "記録、伸ばしてみる？", "まだ続けられるね"]);
+  }
+
+  return randomLine(["スコアモード、始めよ", "メダルを伸ばしてみて", "どこまで続くかな"]);
+}
+
+function scoreAttackDrawLine(scoreChange = null) {
+  const level = getScoreAttackLevel();
+  const stage = scoreAttackStageForLevel(level);
+  const medal = formatScoreValue(scoreChange?.medalRecordCurrent || state.pot);
+
+  if (level >= SCORE_ATTACK_MAX_LEVEL) {
+    return `LV ${level} 完走\nメダルが満ちたね`;
+  }
+
+  if (level % 10 === 0 || stage.rank >= 5) {
+    return `LV ${level} ${stage.name}\n${scoreAttackFlavorLine()}`;
+  }
+
+  if (level % 5 === 0) {
+    return `LV ${level} ${stage.name}\n${medal} メダル`;
+  }
+
+  return randomLine([
+    `LV ${level} ${stage.name}`,
+    `${medal} メダル\nまだ積めるね`,
+    scoreAttackFlavorLine(),
+  ]);
+}
+
+function scoreAttackPoolForLevel(level = getScoreAttackLevel()) {
+  const lv = Math.max(1, Math.min(SCORE_ATTACK_MAX_LEVEL, Number(level) || 1));
+
+  if (lv >= 85) {
+    return [
+      { value: "hesitate", weight: 25 },
+      { value: "bait", weight: 24 },
+      { value: "hide", weight: 18 },
+      { value: "panic", weight: 15 },
+      { value: "mirror", weight: 8 },
+      { value: "honest", weight: 5 },
+      { value: "match", weight: 4 },
+      { value: "trueEnd", weight: 3 },
+    ];
+  }
+
+  if (lv >= 65) {
+    return [
+      { value: "hesitate", weight: 22 },
+      { value: "bait", weight: 20 },
+      { value: "hide", weight: 16 },
+      { value: "panic", weight: 14 },
+      { value: "mirror", weight: 10 },
+      { value: "honest", weight: 8 },
+      { value: "match", weight: 7 },
+      { value: "trueEnd", weight: 4 },
+    ];
+  }
+
+  if (lv >= 45) {
+    return [
+      { value: "hesitate", weight: 20 },
+      { value: "bait", weight: 17 },
+      { value: "hide", weight: 13 },
+      { value: "panic", weight: 12 },
+      { value: "mirror", weight: 12 },
+      { value: "honest", weight: 10 },
+      { value: "match", weight: 10 },
+      { value: "trueEnd", weight: 6 },
+    ];
+  }
+
+  if (lv >= 25) {
+    return [
+      { value: "match", weight: 17 },
+      { value: "trueEnd", weight: 14 },
+      { value: "honest", weight: 14 },
+      { value: "hesitate", weight: 16 },
+      { value: "bait", weight: 12 },
+      { value: "mirror", weight: 12 },
+      { value: "hide", weight: 8 },
+      { value: "panic", weight: 7 },
+    ];
+  }
+
+  if (lv >= 10) {
+    return [
+      { value: "match", weight: 25 },
+      { value: "trueEnd", weight: 18 },
+      { value: "honest", weight: 17 },
+      { value: "hesitate", weight: 13 },
+      { value: "mirror", weight: 11 },
+      { value: "bait", weight: 8 },
+      { value: "hide", weight: 5 },
+      { value: "panic", weight: 3 },
+    ];
+  }
+
+  return [
+    { value: "match", weight: 34 },
+    { value: "trueEnd", weight: 24 },
+    { value: "honest", weight: 20 },
+    { value: "mirror", weight: 10 },
+    { value: "hesitate", weight: 8 },
+    { value: "bait", weight: 3 },
+    { value: "hide", weight: 1 },
+  ];
+}
+
+function scoreAttackMoodForCue(feeling, fallbackMood = "happy") {
+  if (!isScoreAttackMode()) {
+    return fallbackMood;
+  }
+
+  const level = getScoreAttackLevel();
+  const stage = scoreAttackStageForLevel(level);
+
+  if (feeling === "bait" || feeling === "hide") {
+    return level >= 45 ? "smug" : fallbackMood;
+  }
+
+  if (feeling === "hesitate" || feeling === "panic") {
+    return level >= 55 ? "panic" : fallbackMood;
+  }
+
+  if (feeling === "mirror") {
+    return level >= 70 ? "draw" : fallbackMood;
+  }
+
+  if (level >= 90) {
+    return "shocked";
+  }
+
+  if (level >= 55 && (feeling === "match" || feeling === "trueEnd" || feeling === "honest")) {
+    return stage.mood;
+  }
+
+  return fallbackMood;
 }
 
 function buildDebugAnswerFromPsychEvent(event, line = "") {
@@ -3522,6 +3973,92 @@ function weightedChoice(items) {
   return items[items.length - 1]?.value ?? null;
 }
 
+function pushLimitedHistory(list, value, limit = 6) {
+  if (!Array.isArray(list) || !value) {
+    return;
+  }
+
+  list.push(value);
+  while (list.length > limit) {
+    list.shift();
+  }
+}
+
+function recentCount(list, value, limit = 4) {
+  if (!Array.isArray(list) || !value) {
+    return 0;
+  }
+
+  return list.slice(-limit).filter((item) => item === value).length;
+}
+
+function balancedWeightedChoice(items, history = [], options = {}) {
+  const last = history[history.length - 1] || null;
+  const prev = history[history.length - 2] || null;
+  const avoidTriple = options.avoidTriple !== false;
+
+  const adjusted = items.map((item) => {
+    const value = item.value;
+    let weight = Math.max(0, Number(item.weight) || 0);
+    const count = recentCount(history, value, options.window || 4);
+
+    if (count > 0) {
+      weight *= 1 / (1 + count * (options.penalty || 1.35));
+    }
+
+    if (avoidTriple && last && prev && last === prev && value === last) {
+      weight *= 0.03;
+    } else if (last && value === last) {
+      weight *= 0.42;
+    }
+
+    return { ...item, weight };
+  });
+
+  return weightedChoice(adjusted) ?? weightedChoice(items);
+}
+
+function scoreAttackHandForCue(cue) {
+  if (!cue) {
+    return null;
+  }
+
+  if (cue.dynamicMode === "mirror" || cue.feeling === "mirror") {
+    return null;
+  }
+
+  return cue.activeHand ||
+    cue.cpuHand ||
+    cue.avoidHand ||
+    cue.dynamicAvoidHand ||
+    cue.wordHand ||
+    cue.saidHand ||
+    cue.predictedHand ||
+    cue.requestedHand ||
+    null;
+}
+
+function rememberScoreAttackCueVariety(cue, progress = getアルバムProgress()) {
+  if (!isScoreAttackMode(progress) || !cue) {
+    return;
+  }
+
+  pushLimitedHistory(state.scoreAttackFeelingHistory, cue.feeling, 8);
+  pushLimitedHistory(state.scoreAttackHandHistory, scoreAttackHandForCue(cue), 8);
+}
+
+function chooseCueFeeling(pool, progress = getアルバムProgress()) {
+  if (!isScoreAttackMode(progress)) {
+    return weightedChoice(pool);
+  }
+
+  return balancedWeightedChoice(pool, state.scoreAttackFeelingHistory, {
+    window: 5,
+    penalty: 1.15,
+    avoidTriple: true,
+  });
+}
+
 function anotherHand(exceptHand) {
   const keys = Object.keys(hands).filter((key) => key !== exceptHand);
   return keys[Math.floor(Math.random() * keys.length)] || randomCpuHand();
@@ -3565,6 +4102,22 @@ function stopPsychCueMotion() {
 }
 
 function swayIntervalForCue() {
+  if (isScoreAttackMode()) {
+    const scoreLevel = getScoreAttackLevel();
+    if (scoreLevel >= 85) {
+      return 1450;
+    }
+    if (scoreLevel >= 65) {
+      return 1650;
+    }
+    if (scoreLevel >= 45) {
+      return 1850;
+    }
+    if (scoreLevel >= 25) {
+      return 2150;
+    }
+  }
+
   const level = getJankenTempoLevel(state.draw);
   if (level >= 3) {
     return 2000;
@@ -3693,10 +4246,22 @@ function markReadCueDifficulty(cue) {
 function lineTemplatesForCue(cue) {
   const word = handName(cue.wordHand);
   const cpu = handName(cue.cpuHand);
+  const scoreLevel = Number(cue.scoreLevel || 0);
+  const scoreHard = scoreLevel >= 45;
+  const scoreLast = scoreLevel >= 80;
 
   // 画像で見えている雰囲気と、セリフの意図がズレにくい短文に寄せる。
   // 基本は「まだ続けたい」が本心で、その中で見せ方だけを少し変える。
   if (cue.feeling === "match") {
+    if (scoreLast) {
+      return [
+        `${cpu}で
+まだ続ける？`,
+        `${cpu}で
+落ちないでね`,
+      ];
+    }
+
     return [
       `${cpu}で
 あいこにしよ`,
@@ -3706,6 +4271,28 @@ function lineTemplatesForCue(cue) {
   }
 
   if (cue.feeling === "bait") {
+    if (scoreLast) {
+      return [
+        `${word}って
+聞こえた？`,
+        `${word}に
+見えるよね`,
+        `${word}を
+信じる？`,
+      ];
+    }
+
+    if (scoreHard) {
+      return [
+        `${word}に
+しようかな`,
+        `${word}で
+いこうかな`,
+        `${word}を
+信じる？`,
+      ];
+    }
+
     return [
       `${word}に
 しようかな`,
@@ -3841,14 +4428,8 @@ function createReadCue() {
       ];
     }
   } else if (trueEndSeen || phase === "afterTrueEnd") {
-    // TRUE END後は、覚えた型でスコアを伸ばす。難しすぎない。
-    pool = [
-      { value: "trueEnd", weight: 54 },
-      { value: "match", weight: 30 },
-      { value: "mirror", weight: 8 },
-      { value: "panic", weight: 8 },
-      { value: "honest", weight: 6 },
-    ];
+    // TRUE END後はスコアアタック本番。LVが上がるほど特殊読み中心になる。
+    pool = scoreAttackPoolForLevel(getScoreAttackLevel(draw));
   } else if (draw >= getFinalDrawCount()) {
     pool = [
       { value: "match", weight: 34 },
@@ -3892,29 +4473,14 @@ function createReadCue() {
       ...pool,
       { value: "bait", weight: 6 },
     ];
-  }
-
-  // TRUE END後のスコアアタックでは、60〜100回くらいの間でたまにだけキワドイ読みを混ぜる。
-  // ギャラリー回収中は、上のチュートリアル用プールで学習させる。
+  }  // スコアアタックは scoreAttackPoolForLevel() 側でLV別に難度を決める。
   if (isScoreAttackMode(progress)) {
-    const scoreTier = getScoreTier();
-    if (scoreTier >= 1) {
-      pool = [...pool, { value: "hesitate", weight: 1 }];
-    }
-    if (scoreTier >= 2) {
-      pool = [...pool, { value: "bait", weight: 2 }, { value: "hide", weight: 1 }];
-    }
-    if (scoreTier >= 3) {
-      pool = [...pool, { value: "bait", weight: 2 }, { value: "hesitate", weight: 1 }];
-    }
-    if (scoreTier >= 4) {
-      pool = [...pool, { value: "hide", weight: 2 }, { value: "panic", weight: 2 }];
-    }
+    pool = scoreAttackPoolForLevel(getScoreAttackLevel(draw));
   }
 
 
 const trainingFeeling = getTrainingForcedFeeling();
-const feeling = trainingFeeling || weightedChoice(pool) || "honest";
+const feeling = trainingFeeling || chooseCueFeeling(pool, progress) || "honest";
 const feelingSeenCount = getFeelingSeenCount(feeling);
 let cpuHand = randomCpuHand();
 let wordHand = cpuHand;
@@ -3968,6 +4534,10 @@ let hideTeachingStage = null;
     ruleText = "そのまま";
   }
 
+  if (isScoreAttackMode(progress)) {
+    imageMood = scoreAttackMoodForCue(feeling, imageMood);
+  }
+
   const info = feelingInfo(feeling);
   const cue = {
     relationshipIntent: RELATIONSHIP_INTENT,
@@ -4008,10 +4578,13 @@ let hideTeachingStage = null;
     teachWithPose: feeling === "hide",
     preferCloseUp: feeling === "hide",
     targetVisualHand: cpuHand,
+    scoreLevel: isScoreAttackMode(progress) ? getScoreAttackLevel(draw) : 0,
+    scoreStage: isScoreAttackMode(progress) ? scoreAttackStageForLevel(getScoreAttackLevel(draw)).name : "",
   };
 
   markFeelingSeen(feeling);
   cue.line = randomLine(lineTemplatesForCue(cue));
+  rememberScoreAttackCueVariety(cue, progress);
   return cue;
 }
 
@@ -5325,9 +5898,24 @@ function resetRoundView() {
   updateCharacterByScore();
 }
 
-function randomCpuHand() {
+function randomCpuHand(options = {}) {
   const keys = Object.keys(hands);
-  return keys[Math.floor(Math.random() * keys.length)];
+  const progress = getアルバムProgress?.() || {};
+  const useVariety = options.forceVariety === true || isScoreAttackMode(progress);
+
+  if (!useVariety) {
+    return keys[Math.floor(Math.random() * keys.length)];
+  }
+
+  return balancedWeightedChoice(
+    keys.map((key) => ({ value: key, weight: 1 })),
+    state.scoreAttackHandHistory,
+    {
+      window: 5,
+      penalty: 1.45,
+      avoidTriple: true,
+    }
+  ) || keys[Math.floor(Math.random() * keys.length)];
 }
 
 function getDrawAssistRate() {
@@ -5483,6 +6071,76 @@ function resultText(result) {
   return lineFor("draw");
 }
 
+function missHintLineForEvent(event, player, cpu, result) {
+  if (!event || result === "draw") {
+    return null;
+  }
+
+  const feeling = event.feeling || "";
+  const mode = event.dynamicMode ||
+    (feeling === "bait" ? "avoid" : feeling === "mirror" ? "mirror" : feeling === "hesitate" ? "sway" : "");
+  const playerName = handName(player);
+  const cpuName = handName(cpu);
+  const wordName = handName(event.wordHand || event.saidHand || event.predictedHand || event.requestedHand || event.cpuHand);
+  const avoidName = handName(event.avoidHand || event.dynamicAvoidHand || event.wordHand || event.saidHand || event.predictedHand);
+  const activeName = handName(event.activeHand || event.cpuHand || event.wordHand);
+  const targetName = handName(event.cpuHand || event.requestedHand || event.predictedHand);
+
+  const prefix = isScoreAttackMode()
+    ? `LV ${getScoreAttackLevel()}で切れたね`
+    : `さっきは ${playerName}だったね`;
+
+  if (mode === "avoid" || feeling === "bait") {
+    return `${prefix}\nためすは「${avoidName}」以外だったよ`;
+  }
+
+  if (mode === "sway" || feeling === "hesitate") {
+    return `${prefix}\nまよいは 今見えてる手を見てね`;
+  }
+
+  if (feeling === "hide") {
+    return `${prefix}\nないしょは 手元の合図を見てね`;
+  }
+
+  if (feeling === "panic") {
+    return `${prefix}\nあせりは 先に見えた手に合わせてね`;
+  }
+
+  if (mode === "mirror" || feeling === "mirror") {
+    return `${prefix}\nみてる時は あなたの手に合わせるよ`;
+  }
+
+  if (feeling === "honest") {
+    return `${prefix}\nすなおな時は 言った手で合うよ`;
+  }
+
+  if (feeling === "match" || feeling === "trueEnd") {
+    return `${prefix}\n${targetName}で待ってたよ`;
+  }
+
+  if (event.line) {
+    return `${prefix}\n言葉ときもちを一緒に見てね`;
+  }
+
+  return null;
+}
+
+function rememberMissHint(event, player, cpu, result) {
+  if (result === "draw") {
+    state.lastMissHint = null;
+    return;
+  }
+
+  const line = missHintLineForEvent(event, player, cpu, result);
+  state.lastMissHint = line ? {
+    line,
+    feeling: event?.feeling || "",
+    player,
+    cpu,
+    result,
+  } : null;
+}
+
 function stopCountdown() {
   if (state.countdownTimer) {
     window.clearInterval(state.countdownTimer);
@@ -5517,7 +6175,10 @@ function resetScore() {
   state.medalNewRecord = false;
   state.medalNewRecordValue = 0;
   state.lastLine = "";
+  state.lastMissHint = null;
   state.feelingCueSeen = {};
+  state.scoreAttackHandHistory = [];
+  state.scoreAttackFeelingHistory = [];
   setFinalJankenMode(false);
   setChanceMode(false);
   updateScore();
@@ -5526,6 +6187,7 @@ function resetScore() {
 function cleanupForTitle() {
   clearPendingChoice();
   stopPsychCueMotion();
+  stopScoreAttackTimer();
   stopCountdown();
   stopChanceMessages();
   clearCinematicCutIn();
@@ -5534,6 +6196,7 @@ function cleanupForTitle() {
   clearResultLabel();
   clearCharacterBeat();
   clearCharacterPoseHint();
+  stopScoreAttackTimer();
   hideInputGuide(false);
   state.finalConfirmHand = null;
   state.showingTrueEnding = false;
@@ -5545,6 +6208,7 @@ function cleanupForTitle() {
   setStageMood();
 
   endOverlay.hidden = true;
+  finalMessage.classList.remove("has-hint");
   sceneOverlay.hidden = true;
   sceneOverlay.classList.remove("has-illustration");
   sceneIllustration.hidden = true;
@@ -5751,7 +6415,11 @@ async function endGame(result) {
   retryButton.hidden = result === "win";
   countdown.parentElement.hidden = result === "win";
   finalTitle.textContent = result === "win" ? "かち！" : "つづける？";
-  finalMessage.textContent = result === "win" ? "また あそんでね" : "もういっかい？";
+  const missHint = result === "lose" ? state.lastMissHint?.line : "";
+  finalMessage.textContent = result === "win"
+    ? "また あそんでね"
+    : missHint || "もういっかい？";
+  finalMessage.classList.toggle("has-hint", Boolean(missHint));
   retryButton.textContent = "もういっかい";
   endOverlay.hidden = false;
   const routeId = handleアルバムUnlockForEnding(result);
@@ -5782,7 +6450,7 @@ async function endGame(result) {
     return;
   }
 
-  setCharacter("smug");
+  setCharacter(state.lastMissHint ? "worried" : "smug");
   AudioManager.playSound("continue");
   showMessage("あいてのかち！", "is-result is-win", { typewriter: true });
   startContinueCountdown();
@@ -5800,6 +6468,7 @@ function restartMatch() {
   clearResultLabel();
   clearCharacterBeat();
   clearCharacterPoseHint();
+  stopScoreAttackTimer();
   hideInputGuide(false);
   state.finalConfirmHand = null;
   closeアルバム(false);
@@ -5810,6 +6479,7 @@ function restartMatch() {
   state.started = true;
   state.busy = false;
   state.ended = false;
+  state.lastMissHint = null;
   cabinet.classList.remove("is-scene", "scene-intro", "scene-playerWin", "scene-playerLose", "is-ended", "end-win", "end-lose");
   updateアルバムButton();
   resetScore();
@@ -6019,6 +6689,7 @@ async function playRound(player) {
   cabinet.dataset.tempoLevel = String(jankenTempo.level);
   const cpu = chooseCpuHand(player, activePsychEvent);
   const result = judge(player, cpu);
+  rememberMissHint(activePsychEvent, player, cpu, result);
   const scoreChange = addRoundScore(result);
 
   // 掛け声のリズムを3拍で統一する。
@@ -6127,10 +6798,12 @@ async function playRound(player) {
     showMessage(randomLine(FINAL_JANKEN_IDLE_LINES), "is-result is-draw player-draw is-final-entry", { typewriter: true });
   } else if (result === "draw") {
     AudioManager.playSound("draw");
-    const drawLine = state.chance
-      ? randomLine(["あいこ！\nメダル 2ばい！", "メダル大！", "まだつづく！"])
-      : randomLine(["あいこ！\nメダル 2ばい！", "もういっかい！", "ぴったり！"]);
-    showMessage(drawLine, "is-result is-draw player-draw", { typewriter: true });
+    const drawLine = isScoreAttackMode()
+      ? scoreAttackDrawLine(scoreChange)
+      : state.chance
+        ? randomLine(["あいこ！\nメダル 2ばい！", "メダル大！", "まだつづく！"])
+        : randomLine(["あいこ！\nメダル 2ばい！", "もういっかい！", "ぴったり！"]);
+    showMessage(drawLine, isScoreAttackMode() ? "is-result is-draw player-draw is-score-level" : "is-result is-draw player-draw", { typewriter: true });
   } else {
     AudioManager.playSound(result);
     showMessage(resultText(result), `is-result is-${cpuMood} player-${result}`, { typewriter: true });

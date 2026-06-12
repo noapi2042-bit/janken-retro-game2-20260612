@@ -1,13 +1,6 @@
-Data audit clean patch
+Patch: score attack timer
+Version: 20260613-score-attack-timer1
 
-Version: 20260613-data-audit-clean1
+node --check: OK
 
-Checked:
-- node --check: OK
-- HIDE_TUTORIAL_POSE_LIBRARY after CHARACTER_POSE_META: OK
-- bait wording double-negative removal: OK
-- sway text flow restored: OK
-- long idle rhythm stabilization restored: OK
-
-node output:
 node --check OK
