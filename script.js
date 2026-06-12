@@ -125,7 +125,7 @@ const CHOICE_BUFFER_MS = 900;
 
 const urlParams = new URLSearchParams(window.location.search);
 const DEBUG_MODE = urlParams.has("debug");
-const ASSET_VERSION = "20260613-flow-audio-assets1";
+const ASSET_VERSION = "20260613-readability-ui-sfx1";
 
 function assetPath(src) {
   if (!src || /^(?:data:|blob:|https?:)/.test(src) || src.includes("?v=")) {
@@ -1349,6 +1349,8 @@ const AudioManager = (() => {
         lose: [[380, 0, 0.15, { to: 220, volume: 0.28, type: "triangle" }]],
         draw: [[440, 0, 0.055, { volume: 0.24 }], [620, 0.16, 0.07, { volume: 0.28 }]],
         chance: [[520, 0, 0.06], [760, 0.07, 0.06], [1040, 0.14, 0.1], [1320, 0.25, 0.18, { volume: 0.5 }]],
+        focus: [[660, 0, 0.07, { volume: 0.22, type: "triangle" }], [990, 0.11, 0.08, { volume: 0.26, type: "triangle" }]],
+        caution: [[420, 0, 0.08, { volume: 0.22, type: "triangle" }], [740, 0.11, 0.09, { volume: 0.26, type: "square" }]],
         youwin: [[660, 0, 0.1], [880, 0.11, 0.1], [1320, 0.22, 0.25, { volume: 0.52 }]],
         continue: [[330, 0, 0.09], [440, 0.12, 0.09], [330, 0.24, 0.13, { volume: 0.46 }]],
         gameover: [[240, 0, 0.16, { to: 150, type: "sawtooth" }], [160, 0.18, 0.24, { to: 80, volume: 0.42, type: "sawtooth" }]],
@@ -1621,10 +1623,10 @@ function showFinalChoiceConfirm(hand) {
   setSelectedButton(hand);
   setCharacter("excited");
   triggerCinematicCutIn("final");
-  AudioManager.playSound("select");
-  showMessage(`${handName(hand)}で決める？\nもう一度押すと勝負`, "is-result is-final-entry is-final-confirm", {
+  AudioManager.playSound("focus");
+  showMessage(`${handName(hand)}で決める？\nもう一度押すと勝負`, "is-result is-final-entry is-final-confirm is-cue-caution", {
     typewriter: true,
-    maxDuration: 780,
+    maxDuration: 1280,
   });
 }
 
@@ -2520,7 +2522,9 @@ function setStageMood(mood) {
     "is-chance-entry",
     "is-draw-warning",
     "is-final-entry",
-    "is-final-confirm"
+    "is-final-confirm",
+    "is-cue-caution",
+    "is-cue-focus"
   );
 
   if (mood) {
@@ -2944,6 +2948,25 @@ function anotherHand(exceptHand) {
 function feelingInfo(feeling) {
   return FEELING_LABELS[feeling] || FEELING_LABELS.honest;
 }
+function isDifficultFeeling(feeling) {
+  return feeling === "bait" || feeling === "hide" || feeling === "hesitate" || feeling === "panic";
+}
+
+function markReadCueDifficulty(cue) {
+  cabinet.classList.remove("is-cue-caution", "is-cue-focus");
+
+  if (!cue || !cue.feeling) {
+    return;
+  }
+
+  if (isDifficultFeeling(cue.feeling)) {
+    cabinet.classList.add("is-cue-caution");
+    AudioManager.playSound(cue.feeling === "hesitate" ? "focus" : "caution");
+  } else if (cue.feeling === "match" && state.draw >= getChanceDrawCount()) {
+    cabinet.classList.add("is-cue-focus");
+  }
+}
+
 
 function lineTemplatesForCue(cue) {
   const word = handName(cue.wordHand);
@@ -3249,9 +3272,10 @@ function maybeStartPsychEvent(force = false) {
   clearCinematicCutIn();
   const line = psychEventLine(state.psychEvent);
   setDebugAnswerFromPsychEvent(state.psychEvent, line);
+  markReadCueDifficulty(cue);
   showMessage(line, undefined, {
     typewriter: true,
-    maxDuration: 1540,
+    maxDuration: isDifficultFeeling(cue.feeling) ? 1840 : 1620,
   });
   return true;
 }
@@ -3282,7 +3306,7 @@ function showNextInputPrompt() {
     startChanceMessages();
   } else if (isReadModeUnlocked()) {
     setCharacter(currentDialogue().image || "normal");
-    showMessage(lineFor("idle"), undefined, { typewriter: true, maxDuration: 760 });
+    showMessage(lineFor("idle"), undefined, { typewriter: true, maxDuration: 1180 });
   } else {
     showMessage(lineFor("idle"), undefined, { typewriter: true });
   }
@@ -3319,9 +3343,11 @@ function typeMessage(text, options = {}) {
 
   const fullText = text || "いくよ！";
   const typingId = messageTypingId;
-  const maxDuration = options.maxDuration ?? 520;
-  const baseSpeed = options.speed ?? (fullText.length > 14 ? 14 : 20);
-  const speed = Math.max(10, Math.min(baseSpeed, Math.floor(maxDuration / Math.max(fullText.length, 1))));
+  // 読み合いゲームなので、スマホでも読めるテンポを優先する。
+  // 速すぎる文字送りは、考える前に流れてしまうため少しゆっくりにする。
+  const maxDuration = options.maxDuration ?? (FAST_MOBILE_MODE ? 1240 : 1120);
+  const baseSpeed = options.speed ?? (fullText.length > 18 ? 36 : 44);
+  const speed = Math.max(22, Math.min(baseSpeed, Math.floor(maxDuration / Math.max(fullText.length, 1))));
   const sound = options.sound !== false;
   let index = 0;
 
@@ -3395,8 +3421,8 @@ async function showIntroThenReady() {
   setButtonsEnabled(false);
   resetRoundView();
 
-  showMessage("まずは30まい。\n勝ってメダルを取ろう");
-  await wait(900);
+  showMessage("まずは30まい。\n勝ってメダルを取ろう", undefined, { typewriter: true, maxDuration: 1320 });
+  await wait(1280);
 
   if (flowId !== state.flowId || !state.started || state.ended) {
     return;
@@ -3429,10 +3455,10 @@ function startChanceMessages() {
   stopChanceMessages();
   setDebugAnswerNoHint("チャンス中の通常セリフです。");
   if (state.finalJanken) {
-    showMessage(randomLine(FINAL_JANKEN_IDLE_LINES), undefined, { typewriter: true });
+    showMessage(randomLine(FINAL_JANKEN_IDLE_LINES), undefined, { typewriter: true, maxDuration: 1320 });
   } else {
     state.chanceMessageIndex %= CHANCE_MESSAGES.length;
-    showMessage(lineFor("idle"), undefined, { typewriter: true });
+    showMessage(lineFor("idle"), undefined, { typewriter: true, maxDuration: 1320 });
   }
 
   state.chanceMessageTimer = window.setInterval(() => {
@@ -3443,12 +3469,12 @@ function startChanceMessages() {
 
     setDebugAnswerNoHint("チャンス中の通常セリフです。");
     if (state.finalJanken) {
-      showMessage(randomLine(FINAL_JANKEN_IDLE_LINES), undefined, { typewriter: true });
+      showMessage(randomLine(FINAL_JANKEN_IDLE_LINES), undefined, { typewriter: true, maxDuration: 1320 });
     } else {
       state.chanceMessageIndex = (state.chanceMessageIndex + 1) % CHANCE_MESSAGES.length;
-      showMessage(lineFor("idle"), undefined, { typewriter: true });
+      showMessage(lineFor("idle"), undefined, { typewriter: true, maxDuration: 1320 });
     }
-  }, 2600);
+  }, 3600);
 }
 
 async function showFinalJankenEntry() {
@@ -3461,15 +3487,22 @@ async function showFinalJankenEntry() {
   clearCinematicCutIn();
   AudioManager.playSound("chance");
   AudioManager.switchBgm("final");
-  showMessage("さいごのじゃんけん！", "is-result is-draw player-draw is-final-entry");
-  await wait(650);
+  showMessage("さいごのじゃんけん！", "is-result is-draw player-draw is-final-entry", {
+    typewriter: true,
+    maxDuration: 1250,
+  });
+  await wait(980);
 
   if (!state.started || state.ended || !state.finalJanken) {
     return;
   }
 
-  showMessage("ここからノーヒント", "is-result is-final-entry");
-  await wait(720);
+  AudioManager.playSound("caution");
+  showMessage("ここからノーヒント", "is-result is-final-entry is-cue-caution", {
+    typewriter: true,
+    maxDuration: 1320,
+  });
+  await wait(1080);
 
   if (!state.started || state.ended || !state.finalJanken) {
     return;
@@ -3713,7 +3746,13 @@ function preloadStartupAssets() {
   }
 
   const sources = LOW_POWER_MODE
-    ? [hands.rock.image, hands.scissors.image, hands.paper.image]
+    ? [
+        commonCharacterFallbackSources()[0],
+        imageSourceFor(characterImages, "normal"),
+        hands.rock.image,
+        hands.scissors.image,
+        hands.paper.image,
+      ]
     : [
         sceneImages.intro,
         imageSourceFor(characterImages, "normal"),
@@ -3834,6 +3873,8 @@ function commonCharacterFallbackSources() {
     "assets/images/character_draw_01.png",
     "assets/images/character_normal_01.png",
     "assets/images/character_happy_01.png",
+    "assets/images/character_worried_01.png",
+    "assets/images/character_excited_01.png",
     "assets/images/character_draw_01.png.png",
     "assets/images/character_normal_01.png.png",
   ];
@@ -3984,7 +4025,7 @@ function typeSceneLine(text) {
 
     const fullText = String(text || "");
     const currentId = sceneTypingId;
-    const speed = fullText.length > 28 ? 16 : 22;
+    const speed = fullText.length > 28 ? 28 : 36;
     let index = 0;
 
     sceneTypingResolve = resolve;

@@ -6,13 +6,13 @@
   --screen-green: #a8ff70;
   --screen-bg: #041207;
   --ink: #fff7d7;
-  --asset-cabinet-shell: url("assets/images/cabinet_shell.svg?v=20260613-flow-audio-assets1");
-  --asset-marquee-panel: url("assets/images/marquee_panel.svg?v=20260613-flow-audio-assets1");
-  --asset-bezel-frame: url("assets/images/bezel_frame.svg?v=20260613-flow-audio-assets1");
-  --asset-control-panel: url("assets/images/control_panel_base.svg?v=20260613-flow-audio-assets1");
-  --asset-button-plate-rock: url("assets/images/button_plate_rock.svg?v=20260613-flow-audio-assets1");
-  --asset-button-plate-scissors: url("assets/images/button_plate_scissors.svg?v=20260613-flow-audio-assets1");
-  --asset-button-plate-paper: url("assets/images/button_plate_paper.svg?v=20260613-flow-audio-assets1");
+  --asset-cabinet-shell: url("assets/images/cabinet_shell.svg?v=20260613-readability-ui-sfx1");
+  --asset-marquee-panel: url("assets/images/marquee_panel.svg?v=20260613-readability-ui-sfx1");
+  --asset-bezel-frame: url("assets/images/bezel_frame.svg?v=20260613-readability-ui-sfx1");
+  --asset-control-panel: url("assets/images/control_panel_base.svg?v=20260613-readability-ui-sfx1");
+  --asset-button-plate-rock: url("assets/images/button_plate_rock.svg?v=20260613-readability-ui-sfx1");
+  --asset-button-plate-scissors: url("assets/images/button_plate_scissors.svg?v=20260613-readability-ui-sfx1");
+  --asset-button-plate-paper: url("assets/images/button_plate_paper.svg?v=20260613-readability-ui-sfx1");
 }
 
 * {
@@ -4777,5 +4777,217 @@ html.is-lite-performance .hand-card strong.is-hand-pop {
 
   .aiko-guide-hud {
     font-size: clamp(0.5rem, 2.2vw, 0.68rem) !important;
+  }
+}
+
+
+/* ===== Readability / rhythm / UI polish patch ===== */
+
+/* 4項目表示に合わせてスコア欄を整える */
+.scoreboard {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.18fr) minmax(0, 1fr) minmax(0, 1fr) !important;
+  gap: 5px !important;
+  font-size: clamp(0.68rem, 2.85vw, 0.92rem) !important;
+}
+
+.scoreboard span {
+  min-height: 48px !important;
+  padding: 5px 3px 6px !important;
+  line-height: 1.05 !important;
+}
+
+.scoreboard strong {
+  margin-top: 3px !important;
+  font-size: clamp(1.05rem, 4.55vw, 1.42rem) !important;
+}
+
+.score-pot strong {
+  font-size: clamp(1.18rem, 5vw, 1.64rem) !important;
+}
+
+.score-draw {
+  color: #d8fff2 !important;
+  border-color: rgba(172, 255, 230, 0.7) !important;
+}
+
+/* チャンス/さいご条件を小さな注釈ではなく、見えるナビにする */
+.aiko-guide-hud {
+  grid-template-columns: 0.8fr 1.25fr 1.25fr !important;
+  gap: 5px !important;
+  margin-top: 6px !important;
+  padding: 6px 7px !important;
+  font-size: clamp(0.68rem, 2.9vw, 0.9rem) !important;
+  line-height: 1.08 !important;
+  border-width: 2px !important;
+}
+
+.aiko-guide-hud span {
+  padding: 2px 3px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.aiko-guide-hud.is-chance {
+  box-shadow: 0 0 12px rgba(255, 236, 96, 0.22);
+}
+
+.aiko-guide-hud.is-final {
+  box-shadow: 0 0 13px rgba(255, 116, 116, 0.24);
+}
+
+/* セリフは読みやすく、少し見せ場として強くする */
+.message {
+  min-height: 82px !important;
+  width: min(98%, 352px) !important;
+  padding: 12px 15px 15px !important;
+  font-size: clamp(1.36rem, 6.1vw, 2.05rem) !important;
+  line-height: 1.16 !important;
+  border-width: 3px !important;
+}
+
+.message.is-long-message {
+  font-size: clamp(1.16rem, 5.05vw, 1.64rem) !important;
+  line-height: 1.16 !important;
+}
+
+.message.is-very-long-message {
+  font-size: clamp(1.02rem, 4.55vw, 1.38rem) !important;
+  line-height: 1.18 !important;
+}
+
+.cabinet.is-cue-caution .message {
+  --bubble-border: rgba(255, 224, 96, 0.98);
+  --bubble-bg: rgba(31, 19, 0, 0.86);
+  --bubble-glow: rgba(255, 214, 82, 0.24);
+  color: #fff8a8;
+}
+
+.cabinet.is-cue-focus .message {
+  --bubble-border: rgba(255, 165, 230, 0.95);
+  --bubble-bg: rgba(30, 5, 24, 0.82);
+  --bubble-glow: rgba(255, 150, 220, 0.2);
+}
+
+/* 手札表示を少し中央に寄せ、間延び感を減らす */
+.hands {
+  width: min(100%, 296px) !important;
+  grid-template-columns: minmax(0, 1fr) 38px minmax(0, 1fr) !important;
+  gap: 4px !important;
+  min-height: 94px !important;
+  padding-bottom: 3px !important;
+  margin-bottom: 0 !important;
+}
+
+.versus {
+  font-size: clamp(1.05rem, 5.4vw, 1.45rem) !important;
+}
+
+.hand-card {
+  min-height: 92px !important;
+  grid-template-rows: 20px 1fr !important;
+  padding: 6px 5px 7px !important;
+}
+
+.hand-card span {
+  font-size: clamp(0.72rem, 3vw, 0.88rem) !important;
+}
+
+.hand-card strong {
+  min-height: 58px !important;
+  font-size: clamp(2rem, 9.5vw, 2.78rem) !important;
+}
+
+.hand-result-image {
+  max-width: min(68px, 18vw) !important;
+  max-height: min(68px, 18vw) !important;
+}
+
+/* 下ボタンも密度を少し上げて、筐体の一部として締める */
+.control-panel {
+  margin-top: 6px !important;
+  padding: 10px 9px 10px !important;
+}
+
+.choice-buttons {
+  gap: 6px !important;
+}
+
+.choice {
+  min-height: 94px !important;
+  gap: 3px !important;
+  padding: 7px 4px 7px !important;
+  border-radius: 8px !important;
+}
+
+.choice-icon {
+  width: 60px !important;
+  height: 60px !important;
+}
+
+.choice-hand-image {
+  max-width: 54px !important;
+  max-height: 54px !important;
+}
+
+/* 軽量モードでも、必要な注意演出だけは残す */
+html.is-lite-performance .cabinet.is-cue-caution .message {
+  box-shadow: inset 0 0 10px rgba(255, 214, 82, 0.14), 0 0 8px rgba(255, 214, 82, 0.12) !important;
+}
+
+html.is-lite-performance .cabinet.is-cue-focus .message {
+  box-shadow: inset 0 0 10px rgba(255, 150, 220, 0.12), 0 0 8px rgba(255, 150, 220, 0.1) !important;
+}
+
+@media (max-width: 380px) {
+  .scoreboard {
+    gap: 4px !important;
+    font-size: clamp(0.6rem, 2.6vw, 0.78rem) !important;
+  }
+
+  .scoreboard span {
+    min-height: 43px !important;
+    padding: 4px 2px 5px !important;
+  }
+
+  .scoreboard strong {
+    font-size: clamp(0.94rem, 4vw, 1.2rem) !important;
+  }
+
+  .score-pot strong {
+    font-size: clamp(1rem, 4.45vw, 1.36rem) !important;
+  }
+
+  .aiko-guide-hud {
+    font-size: clamp(0.58rem, 2.55vw, 0.74rem) !important;
+    padding: 5px 5px !important;
+    gap: 3px !important;
+  }
+
+  .message {
+    min-height: 78px !important;
+    font-size: clamp(1.18rem, 5.55vw, 1.72rem) !important;
+  }
+
+  .hands {
+    width: min(100%, 278px) !important;
+    grid-template-columns: minmax(0, 1fr) 34px minmax(0, 1fr) !important;
+  }
+
+  .hand-card {
+    min-height: 86px !important;
+  }
+
+  .choice {
+    min-height: 88px !important;
+  }
+
+  .choice-icon {
+    width: 54px !important;
+    height: 54px !important;
+  }
+
+  .choice-hand-image {
+    max-width: 49px !important;
+    max-height: 49px !important;
   }
 }
