@@ -6,13 +6,13 @@
   --screen-green: #a8ff70;
   --screen-bg: #041207;
   --ink: #fff7d7;
-  --asset-cabinet-shell: url("assets/images/cabinet_shell.svg?v=20260613-readability-ui-sfx1");
-  --asset-marquee-panel: url("assets/images/marquee_panel.svg?v=20260613-readability-ui-sfx1");
-  --asset-bezel-frame: url("assets/images/bezel_frame.svg?v=20260613-readability-ui-sfx1");
-  --asset-control-panel: url("assets/images/control_panel_base.svg?v=20260613-readability-ui-sfx1");
-  --asset-button-plate-rock: url("assets/images/button_plate_rock.svg?v=20260613-readability-ui-sfx1");
-  --asset-button-plate-scissors: url("assets/images/button_plate_scissors.svg?v=20260613-readability-ui-sfx1");
-  --asset-button-plate-paper: url("assets/images/button_plate_paper.svg?v=20260613-readability-ui-sfx1");
+  --asset-cabinet-shell: url("assets/images/cabinet_shell.svg?v=20260613-tempo-image-rule1");
+  --asset-marquee-panel: url("assets/images/marquee_panel.svg?v=20260613-tempo-image-rule1");
+  --asset-bezel-frame: url("assets/images/bezel_frame.svg?v=20260613-tempo-image-rule1");
+  --asset-control-panel: url("assets/images/control_panel_base.svg?v=20260613-tempo-image-rule1");
+  --asset-button-plate-rock: url("assets/images/button_plate_rock.svg?v=20260613-tempo-image-rule1");
+  --asset-button-plate-scissors: url("assets/images/button_plate_scissors.svg?v=20260613-tempo-image-rule1");
+  --asset-button-plate-paper: url("assets/images/button_plate_paper.svg?v=20260613-tempo-image-rule1");
 }
 
 * {
@@ -4989,5 +4989,56 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
   .choice-hand-image {
     max-width: 49px !important;
     max-height: 49px !important;
+  }
+}
+
+
+/* ===== Tempo / rule support / image reliability patch ===== */
+
+/* 3回目以降は、気持ちだけを大きめに見せる */
+.mood-badge.is-rule-hidden {
+  min-height: 34px !important;
+  grid-template-rows: auto !important;
+  padding-block: 7px !important;
+  font-size: clamp(0.86rem, 3.7vw, 1.08rem) !important;
+}
+
+/* 画像が出る時はフォールバック顔より前面にしっかり出す */
+.character-frame img,
+.scene-character img {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  z-index: 2;
+}
+
+.character-fallback {
+  position: relative;
+  z-index: 1;
+}
+
+/* あいこが続くほど、掛け声のテンポ感を少し出す。ただし軽量モードでも重くしない */
+.cabinet[data-tempo-level="2"] .message.is-calling,
+.cabinet[data-tempo-level="3"] .message.is-calling,
+.cabinet[data-tempo-level="4"] .message.is-calling {
+  border-color: rgba(255, 236, 112, 0.95) !important;
+}
+
+.cabinet[data-tempo-level="4"] .message.is-calling {
+  color: #fff59b !important;
+}
+
+/* 4列スコアで潰れやすい端末向けに少しだけ再調整 */
+.scoreboard {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.12fr) minmax(0, 1fr) minmax(0, 0.95fr) !important;
+}
+
+@media (max-width: 380px) {
+  .mood-badge.is-rule-hidden {
+    font-size: clamp(0.78rem, 3.35vw, 0.96rem) !important;
+  }
+
+  .scoreboard {
+    gap: 3px !important;
   }
 }

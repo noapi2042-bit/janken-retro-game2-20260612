@@ -125,7 +125,7 @@ const CHOICE_BUFFER_MS = 900;
 
 const urlParams = new URLSearchParams(window.location.search);
 const DEBUG_MODE = urlParams.has("debug");
-const ASSET_VERSION = "20260613-readability-ui-sfx1";
+const ASSET_VERSION = "20260613-tempo-image-rule1";
 
 function assetPath(src) {
   if (!src || /^(?:data:|blob:|https?:)/.test(src) || src.includes("?v=")) {
@@ -816,6 +816,43 @@ const KEYBOARD_HAND_MAP = {
   "3": "paper",
   p: "paper",
 };
+
+function getJankenTempoLevel(drawValue = state.draw) {
+  const draw = Math.max(0, Number(drawValue || 0));
+
+  if (draw >= 30) {
+    return 4;
+  }
+
+  if (draw >= 15) {
+    return 3;
+  }
+
+  if (draw >= 7) {
+    return 2;
+  }
+
+  if (draw >= 3) {
+    return 1;
+  }
+
+  return 0;
+}
+
+function getJankenTempo(drawValue = state.draw) {
+  const level = getJankenTempoLevel(drawValue);
+  const mobileSteps = [300, 240, 200, 165, 135];
+  const desktopSteps = [390, 315, 250, 205, 165];
+  const callStep = (FAST_MOBILE_MODE ? mobileSteps : desktopSteps)[level] || JANKEN_CALL_STEP_MS;
+
+  return {
+    level,
+    callStep,
+    revealToHand: Math.max(8, Math.round(callStep * 0.12)),
+    handPause: Math.max(38, Math.round(callStep * 0.34)),
+  };
+}
+
 
 function isTypingTarget(target) {
   const tagName = target?.tagName?.toLowerCase();
@@ -3651,7 +3688,7 @@ function preloadImage(src) {
   const promise = new Promise((resolve) => {
     const img = new Image();
     img.decoding = "async";
-    img.loading = LOW_POWER_MODE ? "lazy" : "eager";
+    img.loading = "eager";
     try {
       img.fetchPriority = LOW_POWER_MODE ? "low" : "auto";
     } catch (error) {
@@ -3772,6 +3809,28 @@ function imageSourceFor(sourceMap, key, fallbackKey = "normal") {
   return groups[0] || [];
 }
 
+
+function shouldShowFeelingRuleText(feeling) {
+  if (!feeling || !FEELING_LABELS[feeling]) {
+    return false;
+  }
+
+  const progress = getアルバムProgress();
+
+  // 1回目は普通のじゃんけんなので、気持ち表示自体を出しにくくする。
+  if (!progress.normalWin && !progress.trueEndSeen) {
+    return false;
+  }
+
+  // 2回目、チャンス回収までの練習では「きもち＋読み方」を出す。
+  if (isGalleryTrainingMode(progress) && getGalleryTrainingStage(progress) === "basic") {
+    return true;
+  }
+
+  // 3回目以降は、下段サポートを消して少し難しくする。
+  return false;
+}
+
 function shouldShowMoodBadge(mood) {
   if (!state.started || state.ended) {
     return false;
@@ -3809,8 +3868,10 @@ function setMoodBadge(mood) {
   const feeling = state.currentFeeling;
   const info = feeling && FEELING_LABELS[feeling] ? FEELING_LABELS[feeling] : null;
   const label = info ? info.label : MOOD_LABELS[mood] || MOOD_LABELS.normal;
-  const rule = info?.rule || "";
+  const showRule = shouldShowFeelingRuleText(feeling);
+  const rule = showRule ? info?.rule || "" : "";
   moodBadge.textContent = "";
+  moodBadge.classList.toggle("is-rule-hidden", Boolean(info && !showRule));
   if (rule) {
     const main = document.createElement("span");
     const small = document.createElement("small");
@@ -3822,50 +3883,43 @@ function setMoodBadge(mood) {
   }
   moodBadge.hidden = false;
   moodBadge.dataset.mood = feeling || mood;
+  moodBadge.dataset.rule = rule ? "show" : "hide";
 }
 
 function setCharacter(mood, feeling = null) {
   const characterMood = characterImages[mood] ? mood : "normal";
   state.currentFeeling = feeling;
   const requestId = ++characterRequestId;
-  const groups = shuffledImageGroups(characterImages[characterMood]);
 
   characterFrame.dataset.mood = characterMood;
   setMoodBadge(characterMood);
 
-  loadFirstAvailableSource(groups).then((loaded) => {
-    if (requestId !== characterRequestId) {
-      return;
+  loadImageDirectlyWithFallback(
+    characterImage,
+    characterFallback,
+    characterSourcesForMood(characterMood),
+    {
+      priority: "high",
+      isCurrent: () => requestId === characterRequestId,
     }
-
-    if (!loaded) {
-      useFallbackCharacter();
-      return;
-    }
-
-    showLoadedCharacterImage(characterImage, characterFallback, loaded.src, "high");
-  });
+  );
 }
 
 function setSceneCharacter(mood) {
   const requestId = ++sceneCharacterRequestId;
   const characterMood = characterImages[mood] ? mood : "normal";
-  const groups = shuffledImageGroups(characterImages[characterMood]);
   sceneOverlay.classList.remove("has-illustration");
   sceneIllustration.hidden = true;
 
-  loadFirstAvailableSource(groups).then((loaded) => {
-    if (requestId !== sceneCharacterRequestId) {
-      return;
+  loadImageDirectlyWithFallback(
+    sceneCharacterImage,
+    sceneCharacterFallback,
+    characterSourcesForMood(characterMood),
+    {
+      priority: "low",
+      isCurrent: () => requestId === sceneCharacterRequestId,
     }
-
-    if (!loaded) {
-      useFallbackSceneCharacter();
-      return;
-    }
-
-    showLoadedCharacterImage(sceneCharacterImage, sceneCharacterFallback, loaded.src, "low");
-  });
+  );
 }
 
 function commonCharacterFallbackSources() {
@@ -3878,6 +3932,80 @@ function commonCharacterFallbackSources() {
     "assets/images/character_draw_01.png.png",
     "assets/images/character_normal_01.png.png",
   ];
+}
+
+
+function uniqueImageSources(sources) {
+  return [...new Set((sources || []).flat().filter(Boolean))];
+}
+
+function loadImageDirectlyWithFallback(imgElement, fallbackElement, sources, options = {}) {
+  if (!imgElement || !fallbackElement) {
+    return;
+  }
+
+  const candidates = uniqueImageSources(sources);
+  const priority = options.priority || "high";
+  const isCurrent = typeof options.isCurrent === "function" ? options.isCurrent : () => true;
+  let index = 0;
+
+  prepareRuntimeImage(imgElement, priority);
+  imgElement.onload = null;
+  imgElement.onerror = null;
+
+  const failToFallback = () => {
+    if (!isCurrent()) {
+      return;
+    }
+
+    imgElement.hidden = true;
+    imgElement.removeAttribute("src");
+    fallbackElement.hidden = false;
+  };
+
+  const tryNext = () => {
+    if (!isCurrent()) {
+      return;
+    }
+
+    const src = candidates[index];
+    index += 1;
+
+    if (!src) {
+      failToFallback();
+      return;
+    }
+
+    const resolvedSrc = assetPath(src);
+    imgElement.onload = () => {
+      if (!isCurrent()) {
+        return;
+      }
+
+      imgElement.hidden = false;
+      fallbackElement.hidden = true;
+    };
+    imgElement.onerror = () => {
+      if (!isCurrent()) {
+        return;
+      }
+
+      tryNext();
+    };
+
+    // DOM上の画像で直接読み込む。preloadImageのlazy/キャッシュ都合で表示されない事故を避ける。
+    imgElement.hidden = true;
+    fallbackElement.hidden = false;
+    imgElement.src = resolvedSrc;
+  };
+
+  tryNext();
+}
+
+function characterSourcesForMood(mood) {
+  const characterMood = characterImages[mood] ? mood : "normal";
+  const moodSources = shuffledImageGroups(characterImages[characterMood]).flatMap((group) => group);
+  return uniqueImageSources([...moodSources, ...commonCharacterFallbackSources()]);
 }
 
 function showLoadedCharacterImage(imgElement, fallbackElement, src, priority = "high") {
@@ -4924,6 +5052,10 @@ async function playRound(player) {
   setButtonsEnabled(false);
 
   const callMode = state.nextCallMode;
+  // じゃんけんの掛け声は、あいこが続くほど少しずつ速くする。
+  // 判定後ではなく、今回のラウンド開始時点のあいこ数で決める。
+  const jankenTempo = getJankenTempo(state.draw);
+  cabinet.dataset.tempoLevel = String(jankenTempo.level);
   const cpu = chooseCpuHand(player);
   const result = judge(player, cpu);
   const scoreChange = addRoundScore(result);
@@ -4937,7 +5069,7 @@ async function playRound(player) {
     showMessage(call, "is-calling");
     AudioManager.playJankenCallSfx(callSound);
     playCharacterBeat(beatClass);
-    await wait(JANKEN_CALL_STEP_MS);
+    await wait(jankenTempo.callStep);
     if (flowId !== state.flowId) {
       endPlayRoundTimer();
       return;
@@ -4947,7 +5079,7 @@ async function playRound(player) {
   showMessage(revealCall, "is-calling");
   AudioManager.playJankenCallSfx("call3");
   playCharacterBeat("is-beat-3");
-  await wait(JANKEN_REVEAL_TO_HAND_MS);
+  await wait(jankenTempo.revealToHand);
   if (flowId !== state.flowId) {
     endPlayRoundTimer();
     return;
@@ -4956,7 +5088,7 @@ async function playRound(player) {
   renderHand(playerHand, player);
   renderHand(cpuHand, cpu);
   AudioManager.playSound("handPop");
-  await wait(HAND_REVEAL_PAUSE_MS);
+  await wait(jankenTempo.handPause);
   if (flowId !== state.flowId) {
     endPlayRoundTimer();
     return;
