@@ -547,7 +547,7 @@ const DEBUG_MODE = urlParams.has("debug");
 const DEBUG_KEY_SEQUENCE = ["up", "up", "down", "down", "left", "right", "left", "right", "b", "a"];
 const DEBUG_TOUCH_SEQUENCE = ["up", "up", "down", "down", "left", "right", "left", "right", "center", "center"];
 const DEBUG_COMMAND_TIMEOUT_MS = 10000;
-const ASSET_VERSION = "20260613-hide-icon-center-fix1";
+const ASSET_VERSION = "20260613-debug-aiko-jump1";
 
 function assetPath(src) {
   if (!src || /^(?:data:|blob:|https?:)/.test(src) || src.includes("?v=")) {
@@ -587,7 +587,7 @@ function disarmHiddenResetButton() {
 
   if (relationResetButton) {
     relationResetButton.classList.remove("is-confirm");
-    relationResetButton.textContent = "初期化";
+    relationResetButton.textContent = "リセット";
   }
 }
 
@@ -619,7 +619,7 @@ function hardResetSavedGame() {
 function handleHiddenResetButtonClick() {
   if (!hiddenResetConfirmArmed) {
     armHiddenResetButton();
-    showMessage("もう一度押すと\n最初から", "is-cue-caution", {
+    showMessage("もう一度押すと\nアルバムをリセット", "is-cue-caution", {
       typewriter: true,
       maxDuration: 1100,
       speed: 44,
@@ -725,7 +725,7 @@ function ensureBaitLineHasHand(cue) {
     return cue.line;
   }
 
-  return `${handName(hand)}を\n外せる？`;
+  return `${handName(hand)}は\n外してね`;
 }
 
 const RELATIONSHIP_INTENT = "continueAiko";
@@ -757,7 +757,7 @@ const FEELING_LABELS = {
   bait: {
     label: "きもち：ためす",
     rule: "言った手を外す",
-    hint: "言った手以外を出す",
+    hint: "言った手を外す",
   },
   mirror: {
     label: "きもち：みてる",
@@ -2472,16 +2472,31 @@ function isScoreAttackMode(progress = getアルバムProgress()) {
 
 function getMatchBgmMode(progress = getアルバムProgress()) {
   // じゃんけん中のBGMは、試合開始時にだけ決める。
-  // 途中でチャンスやファイナルに入っても曲は変えない。
-  if (!progress.normalWin) {
-    return "normal"; // 1回目の試合
+  // ただし「何回目か」だけで決めると、最後に gameOver 回収だけが残った時にも
+  // final BGM になってしまうため、現在の回収目標で決める。
+  if (progress.trueEndSeen) {
+    return "final"; // TRUE END後のスコアアタック
   }
 
-  if (!progress.chanceWin) {
-    return "chance"; // 2回目の試合
+  const targetRoute = getNextTargetRoute(progress);
+
+  if (targetRoute === "normalWin") {
+    return "normal";
   }
 
-  return "final"; // 3回目以降の試合、TRUE END後のスコアアタック
+  if (targetRoute === "chanceWin") {
+    return "chance";
+  }
+
+  if (targetRoute === "finalWin") {
+    return "final";
+  }
+
+  if (targetRoute === "gameOver") {
+    return "normal"; // 負け回収は通常勝負として始める
+  }
+
+  return "normal";
 }
 
 function currentGameplayBgmMode() {
@@ -2561,9 +2576,11 @@ function updateRelationResetButton() {
     return;
   }
 
-  // デバッグメニューは通常公開では隠すが、初期化だけはタイトル画面に小さく残す。
-  // 誤操作防止のため、実行は2回押しにしている。
+  // 通常の初期化ボタンは出さない。
+  // アルバム100%達成後だけ、タイトル画面にリセットボタンを置く。
+  const progress = getアルバムProgress();
   const shouldShow =
+    isGalleryComplete(progress) &&
     !state.started &&
     !state.busy &&
     !state.ended &&
@@ -2895,9 +2912,9 @@ function createDebugPanel() {
     { label: "こたえ ON/OFF", handler: debugToggleAnswerPanel },
     { label: "アルバムをけす", handler: debugResetAlbumOnly },
     { label: "アルバム全開", handler: debugUnlockAllRoutes },
-    { label: "あいこ 5", handler: () => debugSetDraw(5) },
-    { label: "あいこ 10", handler: debugForceChance },
-    { label: "あいこ 15", handler: debugForceFinal },
+    { label: "あいこ +5", handler: () => debugAddDraw(5) },
+    { label: "あいこ +10", handler: () => debugAddDraw(10) },
+    { label: "あいこ 90へ", handler: () => debugSetDraw(90, "LV100手前確認") },
     { label: "つぎ あなた勝ち", handler: () => debugForceNextResult("win") },
     { label: "つぎ あいて勝ち", handler: () => debugForceNextResult("lose") },
     { label: "試合リセット", handler: debugReset },
@@ -2951,53 +2968,94 @@ function debugForceHint() {
   updateDebugAnswerPanel();
 }
 
-function debugSetDraw(value) {
-  state.draw = value;
-  state.pot = medalForDrawCount(value);
-  state.drawWarningShown = value >= getDrawWarningCount();
+function debugClampDraw(value) {
+  const draw = Math.trunc(Number(value) || 0);
+  return Math.max(0, Math.min(POST_TRUE_COMPLETE_DRAW_COUNT, draw));
+}
+
+function debugApplyDrawState(note = "") {
+  const progress = getアルバムProgress();
+
+  state.draw = debugClampDraw(state.draw);
+  state.pot = medalForDrawCount(state.draw);
+  state.drawWarningShown = state.draw >= getDrawWarningCount();
+  state.finalConfirmHand = null;
+  state.routeReachedChance = state.draw >= getChanceDrawCount();
+  state.routeReachedFinal = state.draw >= getFinalDrawCount();
+
+  // TRUE END後は100あいこ確認用のスコアアタックなので、通常のチャンス/ファイナル状態にはしない。
+  if (isScoreAttackMode(progress)) {
+    setChanceMode(false);
+    setFinalJankenMode(false);
+    clearCinematicCutIn();
+    if (state.started && !state.ended) {
+      AudioManager.switchBgm("final");
+    }
+  } else {
+    state.chance = state.routeReachedChance;
+    state.finalJanken = state.routeReachedFinal;
+    cabinet.classList.toggle("is-chance", state.chance);
+    cabinet.classList.toggle("is-final-janken", state.finalJanken);
+    if (state.finalJanken) {
+      triggerCinematicCutIn("final");
+    } else {
+      clearCinematicCutIn();
+    }
+  }
+
   updateScore();
-  showMessage(`あいこ ${value} 回 / メダル ${formatScoreValue(state.pot)}`);
-  setDebugAnswerText(`あいこ ${value} 回\nメダル ${formatScoreValue(state.pot)} まい`);
+  updateAikoGuideHud();
+  const scoreModeLine = isScoreAttackMode(progress)
+    ? `\nLV ${getScoreAttackLevel(state.draw)} / ${SCORE_ATTACK_MAX_LEVEL}`
+    : "";
+  const noteLine = note ? `\n${note}` : "";
+  const messageMood = isScoreAttackMode(progress) ? "is-result is-draw player-draw is-score-level" : "is-result is-draw player-draw";
+  showMessage(`あいこ ${state.draw} 回\nメダル ${formatScoreValue(state.pot)}`, messageMood, {
+    typewriter: true,
+    maxDuration: 1200,
+  });
+  setDebugAnswerText(`あいこ ${state.draw} 回\nメダル ${formatScoreValue(state.pot)} まい${scoreModeLine}${noteLine}`);
+}
+
+function debugSetDraw(value, note = "") {
+  state.draw = debugClampDraw(value);
+  debugApplyDrawState(note || "指定回数へジャンプ");
+}
+
+function debugAddDraw(delta) {
+  const add = Math.trunc(Number(delta) || 0);
+  const before = debugClampDraw(state.draw);
+  state.draw = debugClampDraw(before + add);
+  debugApplyDrawState(`+${add} / ${before} → ${state.draw}`);
 }
 
 function debugForceWarning() {
-  state.draw = Math.max(state.draw, getDrawWarningCount());
-  state.drawWarningShown = true;
-  updateScore();
+  debugSetDraw(Math.max(state.draw, getDrawWarningCount()), "あいこ注意ライン");
   setCharacter("worried");
-  showMessage(`あいこ ${getDrawWarningCount()} 回`, "is-result is-draw player-draw is-draw-warning");
 }
 
 function debugForceChance() {
-  state.draw = Math.max(state.draw, getChanceDrawCount());
-  state.pot = medalForDrawCount(state.draw);
-  state.drawWarningShown = true;
-  state.finalConfirmHand = null;
+  debugSetDraw(Math.max(state.draw, getChanceDrawCount()), "チャンス確認");
   state.routeReachedChance = true;
-  setChanceMode(true);
-  updateScore();
-  setCharacter("excited");
-  clearCinematicCutIn();
-  AudioManager.switchBgm("chance");
-  showMessage(`あいこ ${state.draw} 回 / メダル ${formatScoreValue(state.pot)}`, "is-result is-draw player-draw is-chance-entry");
-  setDebugAnswerText(`あいこ ${state.draw} 回\nメダル ${formatScoreValue(state.pot)} まい\nチャンス状態`);
+  if (!isScoreAttackMode()) {
+    setChanceMode(true);
+    setCharacter("excited");
+    clearCinematicCutIn();
+    AudioManager.switchBgm("chance");
+  }
 }
 
 function debugForceFinal() {
-  state.draw = Math.max(state.draw, getFinalDrawCount());
-  state.pot = medalForDrawCount(state.draw);
-  state.drawWarningShown = true;
-  state.finalConfirmHand = null;
+  debugSetDraw(Math.max(state.draw, getFinalDrawCount()), "さいごの勝負確認");
   state.routeReachedChance = true;
   state.routeReachedFinal = true;
-  setChanceMode(true);
-  setFinalJankenMode(true);
-  updateScore();
-  setCharacter("excited");
-  triggerCinematicCutIn("final");
-  AudioManager.switchBgm("final");
-  showMessage(`あいこ ${state.draw} 回 / メダル ${formatScoreValue(state.pot)}`, "is-result is-draw player-draw is-final-entry");
-  setDebugAnswerText(`あいこ ${state.draw} 回\nメダル ${formatScoreValue(state.pot)} まい\nさいごの勝負`);
+  if (!isScoreAttackMode()) {
+    setChanceMode(true);
+    setFinalJankenMode(true);
+    setCharacter("excited");
+    triggerCinematicCutIn("final");
+    AudioManager.switchBgm("final");
+  }
 }
 
 function debugForceNextResult(result) {
@@ -3645,7 +3703,7 @@ function routeHintLinesForCurrentTarget() {
   }
 
   if (targetRoute === "finalWin" || phase === "final" || phase === "near") {
-    return ["まよいは\n今の言葉", "ためすは\n言った手以外", "よく見れば\nまだ続くよ", "最後まで\nあわせられる？"];
+    return ["まよいは\n今の言葉", "ためすは\n言った手を外す", "よく見れば\nまだ続くよ", "最後まで\nあわせられる？"];
   }
 
   if (targetRoute === "chanceWin" || phase === "aware" || phase === "read") {
@@ -4391,7 +4449,7 @@ function formatDebugAnswer(answer = state.debugAnswer) {
       `読み方：${ruleText}`,
       "本心：言った手を外したら合わせる",
       `言った手：${avoidName}`,
-      `あいこ：${avoidName}以外ならOK`,
+      `あいこ：${avoidName}を外せばOK`,
       answer.resolvedPlayerHand ? `あなた：${playerName}` : "あなた：まだ未選択",
       answer.cpuHand ? `あいて：${cpuName}` : "あいて：選んだ手に合わせる",
     ].join("\n");
@@ -4793,34 +4851,12 @@ function lineTemplatesForCue(cue) {
   }
 
   if (cue.feeling === "bait") {
-    if (scoreTerminal) {
-      return [
-        scoreAttackNoisyLine(`${word}って\n言っただけ`, scoreLevel),
-        scoreAttackNoisyLine(`${word}以外で\nつないで`, scoreLevel),
-        scoreAttackNoisyLine(`${word}を\n外せる？`, scoreLevel),
-      ];
-    }
-
-    if (scoreLast) {
-      return [
-        scoreAttackNoisyLine(`${word}って\n言ったよ`, scoreLevel),
-        scoreAttackNoisyLine(`${word}を\n外せる？`, scoreLevel),
-        scoreAttackNoisyLine(`${word}以外で\n続けよ`, scoreLevel),
-      ];
-    }
-
-    if (scoreHard) {
-      return [
-        `${word}に\nしようかな`,
-        `${word}を\n外せる？`,
-        `${word}以外を\n見てね`,
-      ];
-    }
-
+    // 「ためす」は精神的に迷いやすいので、表記をパターン化する。
+    // 正解行動は常に「言った手を外す」。まぎらわしい言い回しは使わない。
     return [
-      `${word}に\nしようかな`,
-      `${word}で\nいこうかな`,
-      `${word}を\n出すかも`,
+      `${word}は\n外してね`,
+      `${word}だけ\n外してね`,
+      `${word}を\n選ばないで`,
     ];
   }
 
@@ -5049,7 +5085,7 @@ let hideTeachingStage = null;
     dynamicMode = "avoid";
     imageMood = "smug";
     honest = false;
-    ruleText = "言った手以外";
+    ruleText = "言った手を外す";
   } else if (feeling === "mirror") {
     wordHand = null;
     cpuHand = null;
@@ -5095,7 +5131,7 @@ let hideTeachingStage = null;
     formulaText: dynamicMode === "mirror"
       ? "あなたの手＝あいての手"
       : dynamicMode === "avoid"
-        ? `言った手以外＝あいこ`
+        ? `言った手を外す＝あいこ`
         : dynamicMode === "sway"
           ? "今の言葉＝あいてが合わせる"
           : feeling === "panic"
@@ -6697,7 +6733,7 @@ function missHintLineForEvent(event, player, cpu, result) {
     : `さっきは ${playerName}だったね`;
 
   if (mode === "avoid" || feeling === "bait") {
-    return `${prefix}\nためすは「${avoidName}」以外ならあいこだったよ`;
+    return `${prefix}\nためすは「${avoidName}」を外せばあいこだったよ`;
   }
 
   if (mode === "sway" || feeling === "hesitate") {
@@ -6983,7 +7019,8 @@ async function endPostTrueCompletion(result, scoreChange) {
   finalTitle.textContent = "LV100";
   finalMessage.textContent = `${badge.title || "LV100 完走者"} / 記録保存`;
   finalMessage.classList.remove("has-hint");
-  endOverlay.hidden = false;
+  // キャラが喋っている間に前面の終了パネルが被らないよう、LV100演出中は隠す。
+  endOverlay.hidden = true;
 
   AudioManager.switchBgm("final");
   AudioManager.playSound("chance");

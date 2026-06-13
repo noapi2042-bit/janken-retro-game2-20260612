@@ -1,5 +1,5 @@
-Patch: hide icon center fix
-Version: 20260613-hide-icon-center-fix1
+Patch: debug aiko jump
+Version: 20260613-debug-aiko-jump1
 
 node --check: OK
 
@@ -7,5 +7,9 @@ node --check OK
 
 Static checks:
 - node syntax: OK
-- css scissors adjustment: OK
+- plus 5 button: OK
+- plus 10 button: OK
+- jump 90 button: OK
+- clamps at 100: OK
+- score attack keeps final mode off: OK
 - asset version updated: OK
