@@ -6732,3 +6732,28 @@ html.is-lite-performance .character-frame.is-beat-3 {
     font-size: 0.5rem;
   }
 }
+
+/* Keep the normal title reset button grouped with Start / Album.
+   It shares album-reset-button for reset styling, so this needs to win later. */
+.relation-reset-button.album-reset-button {
+  left: 50%;
+  top: calc(50% + 144px);
+  z-index: 20;
+  min-width: 128px;
+  min-height: 38px;
+  padding: 8px 18px;
+  font-size: 0.9rem;
+  transform: translateX(-50%);
+}
+
+@media (max-width: 420px) {
+  .relation-reset-button.album-reset-button {
+    left: 50%;
+    top: calc(50% + 136px);
+    min-width: 112px;
+    min-height: 32px;
+    padding: 6px 14px;
+    font-size: 0.78rem;
+    transform: translateX(-50%);
+  }
+}

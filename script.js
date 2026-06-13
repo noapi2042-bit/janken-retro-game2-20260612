@@ -818,8 +818,8 @@ const FEELING_LABELS = {
   },
   hesitate: {
     label: "きもち：まよい",
-    rule: "今の言葉に合わせる",
-    hint: "表示中の手を見る",
+    rule: "表示中の手",
+    hint: "表示中の手を出す",
   },
   panic: {
     label: "きもち：あせり",
@@ -3756,7 +3756,7 @@ function routeHintLinesForCurrentTarget() {
   }
 
   if (targetRoute === "finalWin" || phase === "final" || phase === "near") {
-    return ["まよいは\n今の言葉", "ためすは\n言った手はワナ", "よく見れば\nまだ続くよ", "最後まで\nあわせられる？"];
+    return ["まよいは\n今の手", "ためすは\n言った手はワナ", "よく見れば\nまだ続くよ", "最後まで\nあわせられる？"];
   }
 
   if (targetRoute === "chanceWin" || phase === "aware" || phase === "read") {
@@ -4514,10 +4514,40 @@ function formatDebugAnswer(answer = state.debugAnswer) {
       `セリフ：${line}`,
       `きもち：${feelingText}`,
       `読み方：${ruleText}`,
-      "本心：今の気持ちに合わせてほしい",
+      "本心：今見えてる手に合わせてほしい",
       answer.resolvedPlayerHand ? `あなた：${playerName}` : "あなた：まだ未選択",
       answer.cpuHand ? `あいて：${cpuName}` : "あいて：表示中の手に合わせる",
       "あいこ：押した時に出ている手",
+    ].join("\n");
+  }
+
+  if (answer.feeling === "hide") {
+    const cueName = cpuName !== "?" ? cpuName : wordName;
+    return [
+      "こたえ",
+      `セリフ：${line}`,
+      `きもち：${feelingText}`,
+      `読み方：${ruleText}`,
+      "本心：合図の手で合わせたい",
+      `合図の手：${cueName}`,
+      answer.resolvedPlayerHand ? `あなた：${playerName}` : "あなた：まだ未選択",
+      answer.cpuHand ? `あいて：${cpuName}` : "あいて：合図の手",
+      `あいこ：${cueName}`,
+    ].join("\n");
+  }
+
+  if (answer.feeling === "panic") {
+    const seenName = cpuName !== "?" ? cpuName : wordName;
+    return [
+      "こたえ",
+      `セリフ：${line}`,
+      `きもち：${feelingText}`,
+      `読み方：${ruleText}`,
+      "本心：先に見えた手に合わせてほしい",
+      `見えた手：${seenName}`,
+      answer.resolvedPlayerHand ? `あなた：${playerName}` : "あなた：まだ未選択",
+      answer.cpuHand ? `あいて：${cpuName}` : "あいて：見えた手",
+      `あいこ：${seenName}`,
     ].join("\n");
   }
 
@@ -4910,7 +4940,7 @@ function lineTemplatesForCue(cue) {
     if (scoreTerminal) {
       return [
         `${cpu}を\n出してねじゃよ`,
-        `${cpu}で\n合わせてだわさ`,
+        `${cpu}で\n合わせてねだわさ`,
         `${cpu}を\n出してくれるナウ`,
       ];
     }
@@ -4918,7 +4948,7 @@ function lineTemplatesForCue(cue) {
     if (scoreLast) {
       return [
         `${cpu}を\n出してねナウ`,
-        `${cpu}で\n合わせてだべ`,
+        `${cpu}で\n合わせてねだべ`,
         `${cpu}を\n出してくれる？`,
       ];
     }
@@ -4926,7 +4956,7 @@ function lineTemplatesForCue(cue) {
     if (scoreMad) {
       return [
         `${cpu}を\n出してねw`,
-        `${cpu}で\n合わせてktkr`,
+        `${cpu}で\n合わせてねktkr`,
         `${cpu}を\n出してくれる？草`,
       ];
     }
@@ -5007,7 +5037,7 @@ function lineTemplatesForCue(cue) {
     return [
       `あっ…\nもう出しちゃった`,
       `まって…\n手が見えてる…`,
-      `見ないで…\n出ちゃった`,
+      `見えてる…\n出ちゃった`,
     ];
   }
 
@@ -5015,7 +5045,7 @@ function lineTemplatesForCue(cue) {
     if (scoreTerminal) {
       return [
         `${cpu}で\nぴったりじゃよ`,
-        `${cpu}で\n合わせてだわさ`,
+        `${cpu}で\n合わせてねだわさ`,
       ];
     }
 
@@ -5187,7 +5217,7 @@ let hideTeachingStage = null;
     cpuHand = wordHand;
     dynamicMode = "sway";
     imageMood = draw >= getChanceDrawCount() ? "panic" : "worried";
-    ruleText = "今の言葉に合わせる";
+    ruleText = "表示中の手";
   } else if (feeling === "panic") {
     imageMood = "panic";
     ruleText = "先に見えた手";
@@ -5215,7 +5245,7 @@ let hideTeachingStage = null;
       : dynamicMode === "avoid"
         ? `言った手以外＝あいこ`
         : dynamicMode === "sway"
-          ? "今の言葉＝あいてが合わせる"
+          ? "表示中の手＝あいこ"
           : feeling === "panic"
             ? "先に見えた手＝あいこ"
             : feeling === "hide"
