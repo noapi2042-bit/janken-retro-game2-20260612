@@ -1,12 +1,12 @@
-Patch: konami debug
-Version: 20260613-konami-debug1
+Patch: sound button debug
+Version: 20260613-sound-button-debug1
 
 node --check: OK
 
 node --check OK
 
 Static checks:
-- keyboard sequence: OK
-- touch sequence: OK
-- debug unlock: OK
-- touch listener: OK
+- sound button five taps without DEBUG_MODE gate: OK
+- sound button unlockDebugCommand: OK
+- touch command prevent default during progress: OK
+- node syntax: OK

@@ -550,7 +550,7 @@ const DEBUG_MODE = urlParams.has("debug");
 const DEBUG_KEY_SEQUENCE = ["up", "up", "down", "down", "left", "right", "left", "right", "b", "a"];
 const DEBUG_TOUCH_SEQUENCE = ["up", "up", "down", "down", "left", "right", "left", "right", "center", "center"];
 const DEBUG_COMMAND_TIMEOUT_MS = 10000;
-const ASSET_VERSION = "20260613-konami-debug1";
+const ASSET_VERSION = "20260613-sound-button-debug1";
 
 function assetPath(src) {
   if (!src || /^(?:data:|blob:|https?:)/.test(src) || src.includes("?v=")) {
@@ -3046,17 +3046,16 @@ function debugReset() {
 }
 
 function trackDebugToggleTap() {
-  if (!DEBUG_MODE) {
-    return false;
-  }
-
   const now = Date.now();
-  state.debugSoundTaps = state.debugSoundTaps.filter((time) => now - time < 1800);
+
+  // 通常公開URLでも、サウンドボタン5回押しで検証用デバッグを開ける。
+  // 誤爆を減らすため、2.6秒以内の連続タップだけを数える。
+  state.debugSoundTaps = state.debugSoundTaps.filter((time) => now - time < 2600);
   state.debugSoundTaps.push(now);
 
   if (state.debugSoundTaps.length >= 5) {
     state.debugSoundTaps = [];
-    toggleDebugMode();
+    unlockDebugCommand("sound-button");
     return true;
   }
 
@@ -3097,6 +3096,7 @@ function unlockDebugCommand(source = "secret") {
   state.debugCommandUnlocked = true;
   state.debugCommandIndex = 0;
   state.debugCommandLastAt = 0;
+  state.debugSoundTaps = [];
   state.debugAnswerVisible = true;
   toggleDebugMode(true);
   setDebugAnswerText("ひみつのテストを開きました。\nこたえ表示で確認できます。");
@@ -3220,8 +3220,12 @@ function handleDebugTouchCommand(event) {
     return;
   }
 
+  const before = state.debugCommandIndex;
   const unlocked = trackDebugCommandToken(token, DEBUG_TOUCH_SEQUENCE, "touch");
-  if (unlocked) {
+
+  // スマホでは中央タップがSTARTに当たりやすいので、
+  // コマンド入力が始まった後は、途中のタップもゲーム操作へ流さない。
+  if (unlocked || before > 0 || state.debugCommandIndex > 0) {
     event.preventDefault();
     event.stopPropagation();
   }

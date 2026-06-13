@@ -6,13 +6,13 @@
   --screen-green: #a8ff70;
   --screen-bg: #041207;
   --ink: #fff7d7;
-  --asset-cabinet-shell: url("assets/images/cabinet_shell.svg?v=20260613-konami-debug1");
-  --asset-marquee-panel: url("assets/images/marquee_panel.svg?v=20260613-konami-debug1");
-  --asset-bezel-frame: url("assets/images/bezel_frame.svg?v=20260613-konami-debug1");
-  --asset-control-panel: url("assets/images/control_panel_base.svg?v=20260613-konami-debug1");
-  --asset-button-plate-rock: url("assets/images/button_plate_rock.svg?v=20260613-konami-debug1");
-  --asset-button-plate-scissors: url("assets/images/button_plate_scissors.svg?v=20260613-konami-debug1");
-  --asset-button-plate-paper: url("assets/images/button_plate_paper.svg?v=20260613-konami-debug1");
+  --asset-cabinet-shell: url("assets/images/cabinet_shell.svg?v=20260613-sound-button-debug1");
+  --asset-marquee-panel: url("assets/images/marquee_panel.svg?v=20260613-sound-button-debug1");
+  --asset-bezel-frame: url("assets/images/bezel_frame.svg?v=20260613-sound-button-debug1");
+  --asset-control-panel: url("assets/images/control_panel_base.svg?v=20260613-sound-button-debug1");
+  --asset-button-plate-rock: url("assets/images/button_plate_rock.svg?v=20260613-sound-button-debug1");
+  --asset-button-plate-scissors: url("assets/images/button_plate_scissors.svg?v=20260613-sound-button-debug1");
+  --asset-button-plate-paper: url("assets/images/button_plate_paper.svg?v=20260613-sound-button-debug1");
 }
 
 * {
@@ -5309,7 +5309,7 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 }
 
 
-/* ===== 20260613-konami-debug1: character presentation polish ===== */
+/* ===== 20260613-sound-button-debug1: character presentation polish ===== */
 .character-frame {
   --char-height: 152%;
   --char-scale: 1;
@@ -5363,7 +5363,7 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 }
 
 
-/* ===== 20260613-konami-debug1: aiko communication rules ===== */
+/* ===== 20260613-sound-button-debug1: aiko communication rules ===== */
 .cabinet.is-cue-focus .message {
   border-color: rgba(170, 255, 220, 0.96) !important;
   color: #eafff7 !important;
@@ -5379,7 +5379,7 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 }
 
 
-/* ===== 20260613-konami-debug1: HARD mobile layout reset ===== */
+/* ===== 20260613-sound-button-debug1: HARD mobile layout reset ===== */
 
 /* スマホでは、上の進行チップとセリフ枠を絶対に重ねない */
 #medalRecordHud {
@@ -5584,7 +5584,7 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 }
 
 
-/* ===== 20260613-konami-debug1: clean mobile UI without overlapping progress chips ===== */
+/* ===== 20260613-sound-button-debug1: clean mobile UI without overlapping progress chips ===== */
 
 /* 進行チップがセリフ枠に重なり続けたため、通常画面から外す。
    目的・あいこ・チャンス情報は、セリフとスコア表示で伝える。 */
@@ -5701,7 +5701,7 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 }
 
 
-/* ===== 20260613-konami-debug1: special cue notice / moving hesitation ===== */
+/* ===== 20260613-sound-button-debug1: special cue notice / moving hesitation ===== */
 
 .cabinet.is-cue-special .show-window::before {
   opacity: 1 !important;
@@ -5782,7 +5782,7 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 }
 
 
-/* ===== 20260613-konami-debug1: panic pre-reveal + complete run ===== */
+/* ===== 20260613-sound-button-debug1: panic pre-reveal + complete run ===== */
 
 .hand-card.is-pre-revealed {
   border-color: rgba(255, 238, 98, 0.98) !important;
@@ -5899,7 +5899,7 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 }
 
 
-/* ===== 20260613-konami-debug1: まよい文字流し / 長時間待機後の掛け声安定 ===== */
+/* ===== 20260613-sound-button-debug1: まよい文字流し / 長時間待機後の掛け声安定 ===== */
 
 .cabinet.is-cue-sway .message.is-sway-text-flow {
   animation: sway-text-flow-in 0.48s cubic-bezier(0.16, 0.9, 0.24, 1) both;
@@ -5928,7 +5928,7 @@ html.is-lite-performance .cabinet.is-cue-sway .message.is-sway-text-flow {
 }
 
 
-/* ===== 20260613-konami-debug1: input guide clarity ===== */
+/* ===== 20260613-sound-button-debug1: input guide clarity ===== */
 .input-guide {
   top: -36px !important;
   z-index: 22 !important;
@@ -6029,7 +6029,7 @@ html.is-lite-performance .input-guide .input-guide-arrows i {
 }
 
 
-/* ===== 20260613-konami-debug1: result label readability ===== */
+/* ===== 20260613-sound-button-debug1: result label readability ===== */
 /* キャラの上に乗る「とった！」「とられた」を、ボタン化せず読みやすくする */
 .result-label {
   bottom: 22px !important;
@@ -6140,7 +6140,7 @@ html.is-lite-performance .result-label.is-final {
 }
 
 
-/* ===== 20260613-konami-debug1: game over hint comment ===== */
+/* ===== 20260613-sound-button-debug1: game over hint comment ===== */
 .final-message.has-hint {
   max-width: min(92%, 330px);
   white-space: pre-line;
@@ -6191,7 +6191,7 @@ html.is-lite-performance .result-label.is-final {
 }
 
 
-/* ===== 20260613-konami-debug1: score attack level system ===== */
+/* ===== 20260613-sound-button-debug1: score attack level system ===== */
 .cabinet.is-score-level .message {
   border-color: rgba(255, 196, 78, 0.86);
   color: #fff3a6;
@@ -6216,7 +6216,7 @@ html.is-lite-performance .result-label.is-final {
 }
 
 
-/* ===== 20260613-konami-debug1: compact medal number display ===== */
+/* ===== 20260613-sound-button-debug1: compact medal number display ===== */
 .scoreboard span {
   min-width: 0;
   overflow: hidden;
@@ -6284,7 +6284,7 @@ html.is-lite-performance .result-label.is-final {
 }
 
 
-/* ===== 20260613-konami-debug1: score attack countdown timer ===== */
+/* ===== 20260613-sound-button-debug1: score attack countdown timer ===== */
 .score-attack-timer {
   position: absolute;
   top: 76px;
@@ -6394,7 +6394,7 @@ html.is-lite-performance .result-label.is-final {
 }
 
 
-/* ===== 20260613-konami-debug1: audit safety fixes ===== */
+/* ===== 20260613-sound-button-debug1: audit safety fixes ===== */
 .gallery-locked {
   letter-spacing: 0.12em;
 }
@@ -6414,7 +6414,7 @@ html.is-lite-performance .result-label.is-final {
 }
 
 
-/* ===== 20260613-konami-debug1: hidden save reset button ===== */
+/* ===== 20260613-sound-button-debug1: hidden save reset button ===== */
 .save-reset-button {
   position: absolute;
   left: calc(18px + env(safe-area-inset-left));
@@ -6476,7 +6476,7 @@ html.is-lite-performance .result-label.is-final {
 }
 
 
-/* ===== 20260613-konami-debug1: janken voice performance trim ===== */
+/* ===== 20260613-sound-button-debug1: janken voice performance trim ===== */
 .character-frame img {
   backface-visibility: hidden;
 }
@@ -6498,7 +6498,7 @@ html.is-lite-performance .character-frame.is-beat-3 {
 }
 
 
-/* ===== 20260613-konami-debug1: hidden command debug mode ===== */
+/* ===== 20260613-sound-button-debug1: hidden command debug mode ===== */
 .cabinet.is-debug .mood-badge {
   filter: drop-shadow(0 0 6px rgba(255, 242, 122, 0.26));
 }
@@ -6516,5 +6516,23 @@ html.is-lite-performance .character-frame.is-beat-3 {
   .debug-answer-hud {
     max-width: min(96vw, 360px);
     font-size: 10px;
+  }
+}
+
+
+/* ===== 20260613-sound-button-debug1: sound-button debug unlock ===== */
+.debug-answer-hud {
+  pointer-events: none;
+}
+
+.debug-panel {
+  touch-action: manipulation;
+}
+
+@media (max-width: 420px) {
+  .debug-panel {
+    right: 6px;
+    bottom: 6px;
+    width: min(190px, calc(100vw - 12px));
   }
 }
