@@ -547,7 +547,7 @@ const DEBUG_MODE = urlParams.has("debug");
 const DEBUG_KEY_SEQUENCE = ["up", "up", "down", "down", "left", "right", "left", "right", "b", "a"];
 const DEBUG_TOUCH_SEQUENCE = ["up", "up", "down", "down", "left", "right", "left", "right", "center", "center"];
 const DEBUG_COMMAND_TIMEOUT_MS = 10000;
-const ASSET_VERSION = "20260613-debug-aiko-jump1";
+const ASSET_VERSION = "20260613-feeling-wording-clean1";
 
 function assetPath(src) {
   if (!src || /^(?:data:|blob:|https?:)/.test(src) || src.includes("?v=")) {
@@ -715,6 +715,43 @@ function lineMentionsHand(line, hand) {
   return Boolean(name && String(line || "").includes(name));
 }
 
+function baitLineTemplatesForLevel(handNameText, scoreLevel = 0) {
+  const level = Number(scoreLevel || 0);
+
+  // ためすは「言った手がワナ」。
+  // セリフは必ず肯定文にして、プレイヤー側の判断を
+  // 「表示された手以外を出す」に固定する。
+  if (level >= 95) {
+    return [
+      `${handNameText}を\n出すねじゃよ`,
+      `${handNameText}で\nいくよだわさ`,
+      `${handNameText}に\nしようかなナウ`,
+    ];
+  }
+
+  if (level >= 80) {
+    return [
+      `${handNameText}を\n出すねナウ`,
+      `${handNameText}で\nいくよだべ`,
+      `${handNameText}に\nしようかなガビーン`,
+    ];
+  }
+
+  if (level >= 60) {
+    return [
+      `${handNameText}を\n出すねw`,
+      `${handNameText}で\nいくよktkr`,
+      `${handNameText}に\nしようかな草`,
+    ];
+  }
+
+  return [
+    `${handNameText}を\n出すね`,
+    `${handNameText}で\nいくよ`,
+    `${handNameText}に\nしようかな`,
+  ];
+}
+
 function ensureBaitLineHasHand(cue) {
   if (!cue || cue.feeling !== "bait") {
     return cue?.line || "";
@@ -725,7 +762,17 @@ function ensureBaitLineHasHand(cue) {
     return cue.line;
   }
 
-  return `${handName(hand)}は\n外してね`;
+  return baitLineTemplatesForLevel(handName(hand), cue.scoreLevel || 0)[0];
+}
+
+function debugBaitRuleSelfCheck() {
+  // ためす: 言われた手はNG。言われた手以外なら、相手が合わせてあいこ。
+  return Object.keys(hands).every((avoidHand) =>
+    Object.keys(hands).every((playerHand) => {
+      const shouldDraw = playerHand !== avoidHand;
+      return shouldDraw ? playerHand !== avoidHand : playerHand === avoidHand;
+    })
+  );
 }
 
 const RELATIONSHIP_INTENT = "continueAiko";
@@ -746,18 +793,18 @@ const MOOD_LABELS = {
 const FEELING_LABELS = {
   honest: {
     label: "きもち：すなお",
-    rule: "そのまま",
-    hint: "言った手を出す",
+    rule: "本当の手",
+    hint: "本当の手を出す",
   },
   match: {
     label: "きもち：あわせたい",
-    rule: "同じ手",
-    hint: "同じ手で続く",
+    rule: "出してね",
+    hint: "言われた手を出す",
   },
   bait: {
     label: "きもち：ためす",
-    rule: "言った手を外す",
-    hint: "言った手を外す",
+    rule: "言った手はワナ",
+    hint: "言った手以外を出す",
   },
   mirror: {
     label: "きもち：みてる",
@@ -781,8 +828,8 @@ const FEELING_LABELS = {
   },
   trueEnd: {
     label: "きもち：ぴったり",
-    rule: "同じ手",
-    hint: "同じ手で続く",
+    rule: "合わせてね",
+    hint: "同じ手でぴったり",
   },
 };
 const SCENE_INTRO_LINES = [
@@ -2435,9 +2482,15 @@ function getアルバムCompletionPercent() {
   return Math.round((unlockedCount / GALLERY_ROUTE_KEYS.length) * 100);
 }
 
-function isアルバムComplete() {
-  const progress = getアルバムProgress();
+function isアルバムComplete(progress = getアルバムProgress()) {
   return GALLERY_ROUTE_KEYS.every((key) => progress[key]);
+}
+
+function isGalleryComplete(progress = getアルバムProgress()) {
+  // 直前パッチで updateRelationResetButton 側だけ英語名を参照していたため、
+  // 起動時やスタート時に ReferenceError が出てスタート処理が止まっていた。
+  // 日本語名の既存関数へ寄せる安全な別名として残す。
+  return isアルバムComplete(progress);
 }
 
 function getMissingアルバムRoutes(progress = getアルバムProgress()) {
@@ -3703,11 +3756,11 @@ function routeHintLinesForCurrentTarget() {
   }
 
   if (targetRoute === "finalWin" || phase === "final" || phase === "near") {
-    return ["まよいは\n今の言葉", "ためすは\n言った手を外す", "よく見れば\nまだ続くよ", "最後まで\nあわせられる？"];
+    return ["まよいは\n今の言葉", "ためすは\n言った手はワナ", "よく見れば\nまだ続くよ", "最後まで\nあわせられる？"];
   }
 
   if (targetRoute === "chanceWin" || phase === "aware" || phase === "read") {
-    return ["あわせたいは\n同じ手", "すなおは\nそのまま", "まよいは\n今を見て", "あいこ、続けよう"];
+    return ["あわせたいは\n出してね", "すなおは\n本当の手", "まよいは\n今を見て", "あいこ、続けよう"];
   }
 
   return [];
@@ -4426,7 +4479,7 @@ function formatDebugAnswer(answer = state.debugAnswer) {
   const avoidName = handName(answer.avoidHand);
   const playerName = handName(answer.resolvedPlayerHand);
   const feelingText = answer.moodLabel.replace("きもち：", "");
-  const ruleText = answer.ruleText || (answer.honest ? "ことばどおり" : "見せ手を外す");
+  const ruleText = answer.ruleText || (answer.honest ? "ことばどおり" : "表示手を読む");
 
   if (answer.dynamicMode === "mirror") {
     return [
@@ -4447,9 +4500,9 @@ function formatDebugAnswer(answer = state.debugAnswer) {
       `セリフ：${line}`,
       `きもち：${feelingText}`,
       `読み方：${ruleText}`,
-      "本心：言った手を外したら合わせる",
+      "本心：言った手以外なら合わせる",
       `言った手：${avoidName}`,
-      `あいこ：${avoidName}を外せばOK`,
+      `あいこ：${avoidName}以外ならOK`,
       answer.resolvedPlayerHand ? `あなた：${playerName}` : "あなた：まだ未選択",
       answer.cpuHand ? `あいて：${cpuName}` : "あいて：選んだ手に合わせる",
     ].join("\n");
@@ -4816,48 +4869,77 @@ function lineTemplatesForCue(cue) {
   const word = handName(cue.wordHand);
   const cpu = handName(cue.cpuHand);
   const scoreLevel = Number(cue.scoreLevel || 0);
-  const scoreHard = scoreLevel >= 45;
   const scoreMad = scoreLevel >= 60;
   const scoreLast = scoreLevel >= 80;
   const scoreTerminal = scoreLevel >= 95;
 
-  // LV60以降は世界観を少し崩すが、必ずルール上の手が読める文にする。
-  if (cue.feeling === "match") {
+  // きもちごとに、日本語の役割を分ける。
+  // すなお：本当の手を言う
+  // ためす：言った手がワナ
+  // あわせたい：プレイヤーにその手を出してほしい
+  // ぴったり：同じ手で合わせる
+  if (cue.feeling === "honest") {
     if (scoreTerminal) {
       return [
-        scoreAttackNoisyLine(`${cpu}で\n接続しよ`, scoreLevel),
-        scoreAttackNoisyLine(`${cpu}で\nまだ止まらない`, scoreLevel),
+        scoreAttackNoisyLine(`ほんとは\n${cpu}だよ`, scoreLevel),
+        scoreAttackNoisyLine(`${cpu}で\nそのまま`, scoreLevel),
       ];
     }
 
     if (scoreLast) {
       return [
-        scoreAttackNoisyLine(`${cpu}で\nまだ続ける？`, scoreLevel),
-        scoreAttackNoisyLine(`${cpu}で\n落ちないでね`, scoreLevel),
+        scoreAttackNoisyLine(`ほんとは\n${cpu}だよ`, scoreLevel),
+        scoreAttackNoisyLine(`${cpu}で\nそのまま`, scoreLevel),
       ];
     }
 
     if (scoreMad) {
       return [
-        `${cpu}で\n続けよ`,
-        `${cpu}で\n合わせるだべ`,
+        `${cpu}が\nほんとだよ`,
+        `${cpu}で\nそのままw`,
       ];
     }
 
     return [
-      `${cpu}で\nあいこにしよ`,
-      `${cpu}で\n待ってるね`,
+      `ほんとは\n${cpu}だよ`,
+      `${cpu}で\nそのまま`,
+    ];
+  }
+
+  if (cue.feeling === "match") {
+    if (scoreTerminal) {
+      return [
+        `${cpu}を\n出してねじゃよ`,
+        `${cpu}で\n合わせてだわさ`,
+        `${cpu}を\n出してくれるナウ`,
+      ];
+    }
+
+    if (scoreLast) {
+      return [
+        `${cpu}を\n出してねナウ`,
+        `${cpu}で\n合わせてだべ`,
+        `${cpu}を\n出してくれる？`,
+      ];
+    }
+
+    if (scoreMad) {
+      return [
+        `${cpu}を\n出してねw`,
+        `${cpu}で\n合わせてktkr`,
+        `${cpu}を\n出してくれる？草`,
+      ];
+    }
+
+    return [
+      `${cpu}を\n出してね`,
+      `${cpu}で\n合わせてね`,
+      `${cpu}を\n出してくれる？`,
     ];
   }
 
   if (cue.feeling === "bait") {
-    // 「ためす」は精神的に迷いやすいので、表記をパターン化する。
-    // 正解行動は常に「言った手を外す」。まぎらわしい言い回しは使わない。
-    return [
-      `${word}は\n外してね`,
-      `${word}だけ\n外してね`,
-      `${word}を\n選ばないで`,
-    ];
+    return baitLineTemplatesForLevel(word, scoreLevel);
   }
 
   if (cue.feeling === "mirror") {
@@ -4930,29 +5012,29 @@ function lineTemplatesForCue(cue) {
   }
 
   if (cue.feeling === "trueEnd") {
+    if (scoreTerminal) {
+      return [
+        `${cpu}で\nぴったりじゃよ`,
+        `${cpu}で\n合わせてだわさ`,
+      ];
+    }
+
     if (scoreLast) {
       return [
-        scoreAttackNoisyLine(`${cpu}で\n同期しよ`, scoreLevel),
+        scoreAttackNoisyLine(`${cpu}で\nぴったり`, scoreLevel),
         scoreAttackNoisyLine(`${cpu}で\n最後まで`, scoreLevel),
       ];
     }
 
     return [
-      `${cpu}で\nあいこにしよ`,
-      `${cpu}で\n待ってるね`,
-    ];
-  }
-
-  if (scoreLast) {
-    return [
-      scoreAttackNoisyLine(`つぎは\n${cpu}だよ`, scoreLevel),
-      scoreAttackNoisyLine(`わたしは\n${cpu}を出すね`, scoreLevel),
+      `${cpu}で\nぴったり`,
+      `${cpu}で\n合わせてね`,
     ];
   }
 
   return [
-    `つぎは\n${cpu}だよ`,
-    `わたしは\n${cpu}を出すね`,
+    `ほんとは\n${cpu}だよ`,
+    `${cpu}で\nそのまま`,
   ];
 }
 
@@ -5077,7 +5159,7 @@ let hideTeachingStage = null;
 
   if (feeling === "match") {
     imageMood = draw >= getChanceDrawCount() ? "draw" : "happy";
-    ruleText = "同じ手";
+    ruleText = "出してね";
   } else if (feeling === "bait") {
     wordHand = randomCpuHand();
     cpuHand = null;
@@ -5085,7 +5167,7 @@ let hideTeachingStage = null;
     dynamicMode = "avoid";
     imageMood = "smug";
     honest = false;
-    ruleText = "言った手を外す";
+    ruleText = "言った手はワナ";
   } else if (feeling === "mirror") {
     wordHand = null;
     cpuHand = null;
@@ -5111,10 +5193,10 @@ let hideTeachingStage = null;
     ruleText = "先に見えた手";
   } else if (feeling === "trueEnd") {
     imageMood = "happy";
-    ruleText = "同じ手";
+    ruleText = "合わせてね";
   } else {
     imageMood = playerAhead >= 12 ? "worried" : cpuAhead >= 12 ? "smug" : "normal";
-    ruleText = "そのまま";
+    ruleText = "本当の手";
   }
 
   if (isScoreAttackMode(progress)) {
@@ -5131,7 +5213,7 @@ let hideTeachingStage = null;
     formulaText: dynamicMode === "mirror"
       ? "あなたの手＝あいての手"
       : dynamicMode === "avoid"
-        ? `言った手を外す＝あいこ`
+        ? `言った手以外＝あいこ`
         : dynamicMode === "sway"
           ? "今の言葉＝あいてが合わせる"
           : feeling === "panic"
@@ -6398,8 +6480,8 @@ function endingLinesForRoute(routeId) {
       "今日は、あなたの勝ちだね。",
       "でもね、あいこだと\nもう少し一緒にいられるの。",
       "私の「きもち」も、\n少しだけ見てみて。",
-      "あわせたい時は、\n同じ手で待ってるね。",
-      "すなおな時は、\n言った手をそのまま出すよ。",
+      "あわせたい時は、\n出してねに合わせてね。",
+      "すなおな時は、\n本当の手を言うよ。",
       getNextGoalHintLine(routeId),
     ];
   }
@@ -6409,7 +6491,7 @@ function endingLinesForRoute(routeId) {
       "チャンスまで来てくれたね。\nちょっと嬉しい。",
       "でも時々、迷ったり、\n試したりしちゃう。",
       "迷った時は、\n今見えてる言葉が合図だよ。",
-      "試してる時は、\n言った手を外してね。",
+      "試してる時は、\n言った手はワナだよ。",
       getNextGoalHintLine(routeId),
     ];
   }
@@ -6632,10 +6714,10 @@ function chooseCpuHand(player, activeEvent = null) {
       event.resolvedPlayerHand = player;
 
       if (avoidHand && player && player !== avoidHand) {
-        // 言った手を外せたら、必ず相手が合わせてあいこにする。
+        // 言った手以外を出せたら、必ず相手が合わせてあいこにする。
         cpuHand = player;
       } else if (avoidHand && player === avoidHand) {
-        // 言った手をそのまま選んだ時だけ、相手に取られる。
+        // 言った手をそのまま押した時だけ、相手に取られる。
         cpuHand = handThatBeats(player) || randomCpuHand();
       } else if (player) {
         // 念のため avoidHand が取れない場合も、理不尽なランダム勝敗にしない。
@@ -6733,7 +6815,7 @@ function missHintLineForEvent(event, player, cpu, result) {
     : `さっきは ${playerName}だったね`;
 
   if (mode === "avoid" || feeling === "bait") {
-    return `${prefix}\nためすは「${avoidName}」を外せばあいこだったよ`;
+    return `${prefix}\nためすは「${avoidName}」以外ならあいこだったよ`;
   }
 
   if (mode === "sway" || feeling === "hesitate") {
@@ -6753,11 +6835,11 @@ function missHintLineForEvent(event, player, cpu, result) {
   }
 
   if (feeling === "honest") {
-    return `${prefix}\nすなおな時は 言った手で合うよ`;
+    return `${prefix}\nすなおは 本当の手で合うよ`;
   }
 
   if (feeling === "match" || feeling === "trueEnd") {
-    return `${prefix}\n${targetName}で待ってたよ`;
+    return `${prefix}\n${targetName}を出せばあいこだったよ`;
   }
 
   if (event.line) {
@@ -6872,8 +6954,12 @@ function showTitle() {
   setCharacter("normal");
   updateScoreAttackTitleBadge();
   showMessage(getScoreAttackClearBadge() ? "称号 LV100 完走者" : "タップしてね");
-  updateアルバムButton();
-  updateRelationResetButton();
+  try {
+    updateアルバムButton();
+    updateRelationResetButton();
+  } catch (error) {
+    console.warn("title helper button update failed", error);
+  }
 }
 
 async function returnToTitleWithBlackout() {
@@ -7279,7 +7365,12 @@ async function startGame() {
   state.finalConfirmHand = null;
   setSelectedButton();
   setButtonsEnabled(false);
-  updateアルバムButton();
+  try {
+    updateアルバムButton();
+  } catch (error) {
+    // タイトル画面の補助ボタン更新で失敗しても、スタート本体は止めない。
+    console.warn("updateアルバムButton failed during start", error);
+  }
 
   AudioManager.unlockAudio();
   AudioManager.initAudio();
