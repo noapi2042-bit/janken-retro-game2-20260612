@@ -1,5 +1,5 @@
-Patch: audit safety fix
-Version: 20260613-audit-safety-fix1
+Patch: hidden reset button
+Version: 20260613-hidden-reset-button1
 
 node --check: OK
 

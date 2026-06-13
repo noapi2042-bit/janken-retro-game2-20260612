@@ -523,6 +523,8 @@ let characterBeatId = 0;
 let cutInTimer = null;
 let galleryIndex = 0;
 let galleryRequestId = 0;
+let hiddenResetConfirmTimer = null;
+let hiddenResetConfirmArmed = false;
 let galleryPreloadQueued = false;
 let lastChoiceActivationAt = 0;
 let lastInputReadyAt = 0;
@@ -543,7 +545,7 @@ const CHOICE_BUFFER_MS = 900;
 
 const urlParams = new URLSearchParams(window.location.search);
 const DEBUG_MODE = urlParams.has("debug");
-const ASSET_VERSION = "20260613-audit-safety-fix1";
+const ASSET_VERSION = "20260613-hidden-reset-button1";
 
 function assetPath(src) {
   if (!src || /^(?:data:|blob:|https?:)/.test(src) || src.includes("?v=")) {
@@ -572,6 +574,60 @@ function resetSavedGameIfRequested() {
 }
 
 resetSavedGameIfRequested();
+
+function disarmHiddenResetButton() {
+  hiddenResetConfirmArmed = false;
+
+  if (hiddenResetConfirmTimer) {
+    window.clearTimeout(hiddenResetConfirmTimer);
+    hiddenResetConfirmTimer = null;
+  }
+
+  if (relationResetButton) {
+    relationResetButton.classList.remove("is-confirm");
+    relationResetButton.textContent = "初期化";
+  }
+}
+
+function armHiddenResetButton() {
+  hiddenResetConfirmArmed = true;
+
+  if (relationResetButton) {
+    relationResetButton.classList.add("is-confirm");
+    relationResetButton.textContent = "もう一度";
+  }
+
+  if (hiddenResetConfirmTimer) {
+    window.clearTimeout(hiddenResetConfirmTimer);
+  }
+
+  hiddenResetConfirmTimer = window.setTimeout(() => {
+    disarmHiddenResetButton();
+  }, 3200);
+}
+
+function hardResetSavedGame() {
+  clearAllJankenStorage();
+
+  const url = new URL(window.location.href);
+  ["debug", "reset", "fast", "lite", "full", "perf"].forEach((key) => url.searchParams.delete(key));
+  window.location.replace(url.toString());
+}
+
+function handleHiddenResetButtonClick() {
+  if (!hiddenResetConfirmArmed) {
+    armHiddenResetButton();
+    showMessage("もう一度押すと\n最初から", "is-cue-caution", {
+      typewriter: true,
+      maxDuration: 1100,
+      speed: 44,
+    });
+    return;
+  }
+
+  disarmHiddenResetButton();
+  hardResetSavedGame();
+}
 
 function detectLowPowerDevice() {
   try {
@@ -2406,9 +2462,9 @@ function updateRelationResetButton() {
     return;
   }
 
-  const progress = getアルバムProgress();
+  // デバッグメニューは通常公開では隠すが、初期化だけはタイトル画面に小さく残す。
+  // 誤操作防止のため、実行は2回押しにしている。
   const shouldShow =
-    progress.trueEndSeen === true &&
     !state.started &&
     !state.busy &&
     !state.ended &&
@@ -2417,6 +2473,10 @@ function updateRelationResetButton() {
     !startButton.hidden;
 
   relationResetButton.hidden = !shouldShow;
+
+  if (!shouldShow) {
+    disarmHiddenResetButton();
+  }
 }
 
 function updateアルバムButton() {
@@ -6345,6 +6405,7 @@ function showTitle() {
   setCharacter("normal");
   showMessage("タップしてね");
   updateアルバムButton();
+  updateRelationResetButton();
 }
 
 async function returnToTitleWithBlackout() {
@@ -6973,12 +7034,7 @@ sceneIllustration.addEventListener("error", fallbackSceneIllustration);
 startButton.addEventListener("click", startGame);
 retryButton.addEventListener("click", restartMatch);
 galleryButton?.addEventListener("click", openアルバム);
-relationResetButton?.addEventListener("click", () => {
-  resetアルバムProgress();
-  updateアルバムButton();
-  updateRelationResetButton();
-  showTitle();
-});
+relationResetButton?.addEventListener("click", handleHiddenResetButtonClick);
 galleryCloseButton?.addEventListener("click", () => closeアルバム());
 galleryPrevButton?.addEventListener("click", () => moveアルバム(-1));
 galleryNextButton?.addEventListener("click", () => moveアルバム(1));
