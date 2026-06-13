@@ -6603,3 +6603,44 @@ html.is-lite-performance .character-frame.is-beat-3 {
     font-size: 0.78rem;
   }
 }
+
+
+/* ===== 20260613-hide-icon-center-fix1: hide parameter pose hint icon centering ===== */
+.character-pose-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.character-pose-hint img {
+  display: block;
+  width: 72%;
+  height: 72%;
+  object-fit: contain;
+  object-position: center center;
+  margin: 0 auto;
+  transform: translate(0, 0);
+}
+
+/* チョキ画像は見た目の重心が右上に寄りやすいので少しだけ補正 */
+.character-frame[data-pose-hint-hand="scissors"] .character-pose-hint img {
+  width: 70%;
+  height: 70%;
+  transform: translate(-2px, 1px);
+}
+
+/* ほかの手も中央寄せの見た目を安定 */
+.character-frame[data-pose-hint-hand="rock"] .character-pose-hint img {
+  transform: translate(-1px, 1px);
+}
+
+.character-frame[data-pose-hint-hand="paper"] .character-pose-hint img {
+  transform: translate(0, 1px);
+}
+
+@media (max-width: 420px) {
+  .character-frame[data-pose-hint-hand="scissors"] .character-pose-hint img {
+    transform: translate(-1px, 1px);
+  }
+}

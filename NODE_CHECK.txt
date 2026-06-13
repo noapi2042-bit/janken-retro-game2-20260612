@@ -1,15 +1,11 @@
-Patch: LV100 text tune
-Version: 20260613-lv100-text-tune1
+Patch: hide icon center fix
+Version: 20260613-hide-icon-center-fix1
 
 node --check: OK
 
 node --check OK
 
 Static checks:
-- no rejected bait guard: OK
-- no nyo wording: OK
-- dialect suffixes: OK
-- lv100 badge: OK
-- lv100 terminal sequence: OK
-- readable bait: OK
 - node syntax: OK
+- css scissors adjustment: OK
+- asset version updated: OK
