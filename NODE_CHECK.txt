@@ -1,5 +1,5 @@
-Patch: score attack timer
-Version: 20260613-score-attack-timer1
+Patch: audit safety fix
+Version: 20260613-audit-safety-fix1
 
 node --check: OK
 

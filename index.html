@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>あいこメダル</title>
-    <link rel="stylesheet" href="style.css?v=20260613-score-attack-timer1">
+    <link rel="stylesheet" href="style.css?v=20260613-audit-safety-fix1">
   </head>
   <body>
     <main class="cabinet" aria-label="レトロアーケードじゃんけんゲーム">
@@ -60,15 +60,15 @@
                 <button id="galleryCloseButton" type="button">とじる</button>
               </div>
               <div class="gallery-preview">
-                <img id="galleryImage" alt="Gallery image" decoding="async" loading="lazy" hidden>
-                <div id="galleryLocked" class="gallery-locked" hidden>LOCKED</div>
+                <img id="galleryImage" alt="アルバム画像" decoding="async" loading="lazy" hidden>
+                <div id="galleryLocked" class="gallery-locked" hidden>未開放</div>
               </div>
               <p id="galleryProgress" class="gallery-progress"></p>
               <p id="galleryCaption" class="gallery-caption"></p>
               <div class="gallery-controls">
-                <button id="galleryPrevButton" type="button" aria-label="Previous gallery image">&lt;</button>
+                <button id="galleryPrevButton" type="button" aria-label="前のアルバム画像">&lt;</button>
                 <span id="galleryCounter"></span>
-                <button id="galleryNextButton" type="button" aria-label="Next gallery image">&gt;</button>
+                <button id="galleryNextButton" type="button" aria-label="次のアルバム画像">&gt;</button>
               </div>
             </div>
           </div>
@@ -90,7 +90,7 @@
             <span id="nextFinalLabel">さいごまで あと15</span>
           </div>
           <div id="scoreAttackTimer" class="score-attack-timer" hidden aria-live="polite">
-            <span id="scoreAttackTimerLabel">TIME</span>
+            <span id="scoreAttackTimerLabel">じかん</span>
             <strong id="scoreAttackTimerValue">10</strong>
           </div>
 
@@ -139,19 +139,19 @@
         <div class="choice-buttons">
           <button class="choice rock" type="button" data-hand="rock" aria-label="ぐー" disabled>
             <span class="choice-icon">
-              <img src="assets/images/janken_gu.png?v=20260613-score-attack-timer1" alt="" class="choice-hand-image" decoding="async" loading="eager">
+              <img src="assets/images/janken_gu.png?v=20260613-audit-safety-fix1" alt="" class="choice-hand-image" decoding="async" loading="eager">
             </span>
             <span>ぐー</span>
           </button>
           <button class="choice scissors" type="button" data-hand="scissors" aria-label="ちょき" disabled>
             <span class="choice-icon">
-              <img src="assets/images/janken_choki.png?v=20260613-score-attack-timer1" alt="" class="choice-hand-image" decoding="async" loading="eager">
+              <img src="assets/images/janken_choki.png?v=20260613-audit-safety-fix1" alt="" class="choice-hand-image" decoding="async" loading="eager">
             </span>
             <span>ちょき</span>
           </button>
           <button class="choice paper" type="button" data-hand="paper" aria-label="ぱー" disabled>
             <span class="choice-icon">
-              <img src="assets/images/janken_pa.png?v=20260613-score-attack-timer1" alt="" class="choice-hand-image" decoding="async" loading="eager">
+              <img src="assets/images/janken_pa.png?v=20260613-audit-safety-fix1" alt="" class="choice-hand-image" decoding="async" loading="eager">
             </span>
             <span>ぱー</span>
           </button>
@@ -159,6 +159,6 @@
       </section>
     </main>
 
-    <script src="script.js?v=20260613-score-attack-timer1"></script>
+    <script src="script.js?v=20260613-audit-safety-fix1"></script>
   </body>
 </html>

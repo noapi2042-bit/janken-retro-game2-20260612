@@ -6,13 +6,13 @@
   --screen-green: #a8ff70;
   --screen-bg: #041207;
   --ink: #fff7d7;
-  --asset-cabinet-shell: url("assets/images/cabinet_shell.svg?v=20260613-score-attack-timer1");
-  --asset-marquee-panel: url("assets/images/marquee_panel.svg?v=20260613-score-attack-timer1");
-  --asset-bezel-frame: url("assets/images/bezel_frame.svg?v=20260613-score-attack-timer1");
-  --asset-control-panel: url("assets/images/control_panel_base.svg?v=20260613-score-attack-timer1");
-  --asset-button-plate-rock: url("assets/images/button_plate_rock.svg?v=20260613-score-attack-timer1");
-  --asset-button-plate-scissors: url("assets/images/button_plate_scissors.svg?v=20260613-score-attack-timer1");
-  --asset-button-plate-paper: url("assets/images/button_plate_paper.svg?v=20260613-score-attack-timer1");
+  --asset-cabinet-shell: url("assets/images/cabinet_shell.svg?v=20260613-audit-safety-fix1");
+  --asset-marquee-panel: url("assets/images/marquee_panel.svg?v=20260613-audit-safety-fix1");
+  --asset-bezel-frame: url("assets/images/bezel_frame.svg?v=20260613-audit-safety-fix1");
+  --asset-control-panel: url("assets/images/control_panel_base.svg?v=20260613-audit-safety-fix1");
+  --asset-button-plate-rock: url("assets/images/button_plate_rock.svg?v=20260613-audit-safety-fix1");
+  --asset-button-plate-scissors: url("assets/images/button_plate_scissors.svg?v=20260613-audit-safety-fix1");
+  --asset-button-plate-paper: url("assets/images/button_plate_paper.svg?v=20260613-audit-safety-fix1");
 }
 
 * {
@@ -42,7 +42,7 @@ body {
     linear-gradient(135deg, #15110e, #050505 62%);
   color: var(--ink);
   font-family: "Arial Black", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
-  touch-action: none;
+  touch-action: manipulation;
 }
 
 button {
@@ -91,7 +91,7 @@ button {
   max-height: 100dvh;
   min-height: 100svh;
   overflow: hidden;
-  touch-action: none;
+  touch-action: manipulation;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   padding: 10px 10px 12px;
@@ -5309,7 +5309,7 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 }
 
 
-/* ===== 20260613-score-attack-timer1: character presentation polish ===== */
+/* ===== 20260613-audit-safety-fix1: character presentation polish ===== */
 .character-frame {
   --char-height: 152%;
   --char-scale: 1;
@@ -5363,7 +5363,7 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 }
 
 
-/* ===== 20260613-score-attack-timer1: aiko communication rules ===== */
+/* ===== 20260613-audit-safety-fix1: aiko communication rules ===== */
 .cabinet.is-cue-focus .message {
   border-color: rgba(170, 255, 220, 0.96) !important;
   color: #eafff7 !important;
@@ -5379,7 +5379,7 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 }
 
 
-/* ===== 20260613-score-attack-timer1: HARD mobile layout reset ===== */
+/* ===== 20260613-audit-safety-fix1: HARD mobile layout reset ===== */
 
 /* スマホでは、上の進行チップとセリフ枠を絶対に重ねない */
 #medalRecordHud {
@@ -5584,7 +5584,7 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 }
 
 
-/* ===== 20260613-score-attack-timer1: clean mobile UI without overlapping progress chips ===== */
+/* ===== 20260613-audit-safety-fix1: clean mobile UI without overlapping progress chips ===== */
 
 /* 進行チップがセリフ枠に重なり続けたため、通常画面から外す。
    目的・あいこ・チャンス情報は、セリフとスコア表示で伝える。 */
@@ -5701,7 +5701,7 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 }
 
 
-/* ===== 20260613-score-attack-timer1: special cue notice / moving hesitation ===== */
+/* ===== 20260613-audit-safety-fix1: special cue notice / moving hesitation ===== */
 
 .cabinet.is-cue-special .show-window::before {
   opacity: 1 !important;
@@ -5782,7 +5782,7 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 }
 
 
-/* ===== 20260613-score-attack-timer1: panic pre-reveal + complete run ===== */
+/* ===== 20260613-audit-safety-fix1: panic pre-reveal + complete run ===== */
 
 .hand-card.is-pre-revealed {
   border-color: rgba(255, 238, 98, 0.98) !important;
@@ -5899,7 +5899,7 @@ html.is-lite-performance .cabinet.is-cue-focus .message {
 }
 
 
-/* ===== 20260613-score-attack-timer1: まよい文字流し / 長時間待機後の掛け声安定 ===== */
+/* ===== 20260613-audit-safety-fix1: まよい文字流し / 長時間待機後の掛け声安定 ===== */
 
 .cabinet.is-cue-sway .message.is-sway-text-flow {
   animation: sway-text-flow-in 0.48s cubic-bezier(0.16, 0.9, 0.24, 1) both;
@@ -5928,7 +5928,7 @@ html.is-lite-performance .cabinet.is-cue-sway .message.is-sway-text-flow {
 }
 
 
-/* ===== 20260613-score-attack-timer1: input guide clarity ===== */
+/* ===== 20260613-audit-safety-fix1: input guide clarity ===== */
 .input-guide {
   top: -36px !important;
   z-index: 22 !important;
@@ -6029,7 +6029,7 @@ html.is-lite-performance .input-guide .input-guide-arrows i {
 }
 
 
-/* ===== 20260613-score-attack-timer1: result label readability ===== */
+/* ===== 20260613-audit-safety-fix1: result label readability ===== */
 /* キャラの上に乗る「とった！」「とられた」を、ボタン化せず読みやすくする */
 .result-label {
   bottom: 22px !important;
@@ -6140,7 +6140,7 @@ html.is-lite-performance .result-label.is-final {
 }
 
 
-/* ===== 20260613-score-attack-timer1: game over hint comment ===== */
+/* ===== 20260613-audit-safety-fix1: game over hint comment ===== */
 .final-message.has-hint {
   max-width: min(92%, 330px);
   white-space: pre-line;
@@ -6191,7 +6191,7 @@ html.is-lite-performance .result-label.is-final {
 }
 
 
-/* ===== 20260613-score-attack-timer1: score attack level system ===== */
+/* ===== 20260613-audit-safety-fix1: score attack level system ===== */
 .cabinet.is-score-level .message {
   border-color: rgba(255, 196, 78, 0.86);
   color: #fff3a6;
@@ -6216,7 +6216,7 @@ html.is-lite-performance .result-label.is-final {
 }
 
 
-/* ===== 20260613-score-attack-timer1: compact medal number display ===== */
+/* ===== 20260613-audit-safety-fix1: compact medal number display ===== */
 .scoreboard span {
   min-width: 0;
   overflow: hidden;
@@ -6284,7 +6284,7 @@ html.is-lite-performance .result-label.is-final {
 }
 
 
-/* ===== 20260613-score-attack-timer1: score attack countdown timer ===== */
+/* ===== 20260613-audit-safety-fix1: score attack countdown timer ===== */
 .score-attack-timer {
   position: absolute;
   top: 76px;
@@ -6391,4 +6391,24 @@ html.is-lite-performance .result-label.is-final {
     min-width: 70px;
     gap: 4px;
   }
+}
+
+
+/* ===== 20260613-audit-safety-fix1: audit safety fixes ===== */
+.gallery-locked {
+  letter-spacing: 0.12em;
+}
+
+.choice,
+.choice-buttons,
+.hand-card,
+.message,
+.result-label,
+.input-guide,
+.mood-badge {
+  touch-action: manipulation;
+}
+
+.score-attack-timer.is-paused {
+  opacity: 0.62;
 }

@@ -532,6 +532,7 @@ let pendingChoiceTimer = null;
 let psychCueMessageTimer = null;
 let scoreAttackTimerTick = null;
 let scoreAttackTimerTimeout = null;
+let scoreAttackTimerStartDelayTimer = null;
 let scoreAttackTimerDeadline = 0;
 let scoreAttackTimerLimitSeconds = 0;
 let lastSpecialCueSignalAt = 0;
@@ -542,7 +543,7 @@ const CHOICE_BUFFER_MS = 900;
 
 const urlParams = new URLSearchParams(window.location.search);
 const DEBUG_MODE = urlParams.has("debug");
-const ASSET_VERSION = "20260613-score-attack-timer1";
+const ASSET_VERSION = "20260613-audit-safety-fix1";
 
 function assetPath(src) {
   if (!src || /^(?:data:|blob:|https?:)/.test(src) || src.includes("?v=")) {
@@ -624,9 +625,9 @@ const JANKEN_REVEAL_TO_HAND_MS = FAST_MOBILE_MODE ? 10 : 26;
 const HAND_REVEAL_PAUSE_MS = FAST_MOBILE_MODE ? 55 : 90;
 const RESULT_PAUSE_SCALE = FAST_MOBILE_MODE ? 0.98 : 1;
 const MATCH_POINT = 30;
-const BASE_メダル = 5;
-const MAX_メダル = BASE_メダル * (2 ** 100);
-const JACKメダル_MULTIPLIER = 2;
+const BASE_メダル = 5n;
+const MAX_メダル = BASE_メダル * (2n ** 100n);
+const JACKメダル_MULTIPLIER = 2n;
 const CONTINUE_SECONDS = 10;
 const DRAW_WARNING_COUNT = 5;
 const CHANCE_DRAW_COUNT = 10;
@@ -688,8 +689,8 @@ const FEELING_LABELS = {
   },
   hide: {
     label: "きもち：ないしょ",
-    rule: "隠した手",
-    hint: "ないしょの手を見る",
+    rule: "手元の合図",
+    hint: "手元の合図を見る",
   },
   hesitate: {
     label: "きもち：まよい",
@@ -698,8 +699,8 @@ const FEELING_LABELS = {
   },
   panic: {
     label: "きもち：あせり",
-    rule: "見えてる手",
-    hint: "あいての手を見る",
+    rule: "先に見えた手",
+    hint: "先に見えた手に合わせる",
   },
   trueEnd: {
     label: "きもち：ぴったり",
@@ -891,73 +892,144 @@ function getPostTrueDrawRecord() {
   return loadPostTrueDrawRecord();
 }
 
-function normalizeScoreValue(value) {
-  const number = Number(value || 0);
-
-  if (!Number.isFinite(number)) {
-    return 0;
+function parseScoreStringToBigInt(rawValue) {
+  const raw = String(rawValue ?? "").trim();
+  if (!raw) {
+    return 0n;
   }
 
-  return Math.max(0, Math.min(MAX_メダル, Math.floor(number)));
+  const cleaned = raw.replace(/,/g, "");
+  if (/^\d+$/.test(cleaned)) {
+    return BigInt(cleaned);
+  }
+
+  // 旧版が e 表記で保存してしまった時の保険。完全精度ではないが、読み込み不能は避ける。
+  const numeric = Number(cleaned);
+  if (Number.isFinite(numeric) && numeric > 0) {
+    return BigInt(Math.floor(numeric));
+  }
+
+  return 0n;
+}
+
+function normalizeScoreValue(value) {
+  let score;
+
+  if (typeof value === "bigint") {
+    score = value;
+  } else if (typeof value === "number") {
+    if (!Number.isFinite(value) || value <= 0) {
+      return 0n;
+    }
+    score = BigInt(Math.floor(value));
+  } else {
+    score = parseScoreStringToBigInt(value);
+  }
+
+  if (score < 0n) {
+    return 0n;
+  }
+
+  return score > MAX_メダル ? MAX_メダル : score;
+}
+
+function scoreToTitle(value) {
+  return normalizeScoreValue(value).toString();
+}
+
+function scoreCompare(a, b) {
+  const left = normalizeScoreValue(a);
+  const right = normalizeScoreValue(b);
+  return left === right ? 0 : left > right ? 1 : -1;
+}
+
+function scoreAdd(a, b) {
+  return normalizeScoreValue(normalizeScoreValue(a) + normalizeScoreValue(b));
+}
+
+function scoreMin(a, b) {
+  return scoreCompare(a, b) <= 0 ? normalizeScoreValue(a) : normalizeScoreValue(b);
+}
+
+function scoreAtLeast(value, threshold) {
+  const target = typeof threshold === "bigint" ? threshold : BigInt(Math.ceil(Number(threshold) || 0));
+  return normalizeScoreValue(value) >= target;
+}
+
+function scoreGreaterThan(value, threshold) {
+  const target = typeof threshold === "bigint" ? threshold : BigInt(Math.floor(Number(threshold) || 0));
+  return normalizeScoreValue(value) > target;
+}
+
+function scoreDiffAsNumber(a, b) {
+  const diff = normalizeScoreValue(a) - normalizeScoreValue(b);
+  const cap = 1000000n;
+
+  if (diff > cap) {
+    return Number(cap);
+  }
+
+  if (diff < -cap) {
+    return -Number(cap);
+  }
+
+  return Number(diff);
+}
+
+function maxScoreValue(a, b) {
+  return scoreCompare(a, b) >= 0 ? normalizeScoreValue(a) : normalizeScoreValue(b);
 }
 
 function formatScoreValue(value) {
   const score = normalizeScoreValue(value);
 
-  if (score < 10000) {
-    return String(score);
+  if (score < 10000n) {
+    return score.toString();
   }
 
-  // スコアアタックではメダルが急激に増えるため、枠に収まる和風単位で短縮する。
-  // 例：83886080 → 8389万、838860800 → 8.39億
+  // 指数表記は使わず、和風単位で短く出す。
   const units = ["", "万", "億", "兆", "京", "垓", "秭", "穣", "溝", "澗"];
-  const unitIndex = Math.max(1, Math.min(units.length - 1, Math.floor(Math.log10(score) / 4)));
-  const scaled = score / (10 ** (unitIndex * 4));
-  let digits;
+  const digits = score.toString();
+  const unitIndex = Math.max(1, Math.min(units.length - 1, Math.floor((digits.length - 1) / 4)));
+  const integerLength = digits.length - unitIndex * 4;
+  const integerPart = digits.slice(0, integerLength);
+  const fractionPart = digits.slice(integerLength, integerLength + 2);
 
-  if (scaled >= 1000) {
-    digits = String(Math.round(scaled));
-  } else if (scaled >= 100) {
-    digits = String(Math.round(scaled));
-  } else if (scaled >= 10) {
-    digits = scaled.toFixed(1);
+  let display;
+  if (integerPart.length >= 4) {
+    display = integerPart;
+  } else if (integerPart.length === 3) {
+    display = integerPart;
+  } else if (integerPart.length === 2) {
+    display = `${integerPart}.${fractionPart.slice(0, 1)}`;
   } else {
-    digits = scaled.toFixed(2);
+    display = `${integerPart}.${fractionPart}`;
   }
 
-  digits = digits.replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
+  display = display.replace(/\.$/, "").replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
 
-  // 画面上の小さい枠に入れるため、長すぎる場合は少し丸める。
-  if (digits.length > 4 && digits.includes(".")) {
-    digits = String(Math.round(scaled));
-  }
-  if (digits.length > 4) {
-    digits = Number(scaled).toPrecision(3).replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
-  }
-
-  return `${digits}${units[unitIndex]}`;
+  return `${display}${units[unitIndex]}`;
 }
 
 function loadBestMedalRecord() {
   try {
-    const raw = window.localStorage.getItem(BEST_MEDAL_RECORD_KEY);
-    return normalizeScoreValue(raw);
+    return normalizeScoreValue(window.localStorage.getItem(BEST_MEDAL_RECORD_KEY));
   } catch (error) {
-    return 0;
+    return 0n;
   }
 }
 
 function saveBestMedalRecord(value) {
   try {
-    window.localStorage.setItem(BEST_MEDAL_RECORD_KEY, String(normalizeScoreValue(value)));
+    window.localStorage.setItem(BEST_MEDAL_RECORD_KEY, normalizeScoreValue(value).toString());
   } catch (error) {
     // Storage errors should not stop gameplay.
   }
 }
 
 function getBestMedalRecord() {
-  const memoryRecord = typeof state !== "undefined" ? normalizeScoreValue(state.bestMedalRecord || 0) : 0;
-  return Math.max(memoryRecord, loadBestMedalRecord());
+  const memoryRecord = typeof state !== "undefined" ? normalizeScoreValue(state.bestMedalRecord || 0n) : 0n;
+  return maxScoreValue(memoryRecord, loadBestMedalRecord());
 }
 
 function maybeUpdateBestMedalRecord(value) {
@@ -976,7 +1048,7 @@ function maybeUpdateBestMedalRecord(value) {
   }
 
   state.bestMedalRecord = score;
-  state.medalNewRecord = previous > 0;
+  state.medalNewRecord = previous > 0n;
   state.medalNewRecordValue = score;
   saveBestMedalRecord(score);
   updateMedalRecordHud();
@@ -985,7 +1057,7 @@ function maybeUpdateBestMedalRecord(value) {
     updated: true,
     previous,
     current: score,
-    announce: previous > 0 && score >= 160,
+    announce: previous > 0n && score >= 160n,
   };
 }
 
@@ -1112,8 +1184,8 @@ const state = {
   started: false,
   busy: false,
   ended: false,
-  win: 0,
-  lose: 0,
+  win: 0n,
+  lose: 0n,
   draw: 0,
   pot: BASE_メダル,
   chance: false,
@@ -1143,7 +1215,7 @@ const state = {
   postTrueNewRecordShownFor: 0,
   bestMedalRecord: loadBestMedalRecord(),
   medalNewRecord: false,
-  medalNewRecordValue: 0,
+  medalNewRecordValue: 0n,
   currentFeeling: null,
   lastLine: "",
   lastMissHint: null,
@@ -1413,7 +1485,7 @@ function isChoiceInputLocked(button) {
 }
 
 function shouldSuppressBrowserGesture(target) {
-  return Boolean(target?.closest?.(".cabinet"));
+  return Boolean(target?.closest?.(".choice, .choice-buttons, .hand-card, .message, .result-label, .input-guide, .mood-badge"));
 }
 
 ["selectstart", "dragstart"].forEach((eventName) => {
@@ -2120,7 +2192,6 @@ function setButtonsEnabled(enabled) {
   if (enabled && state.started && !state.busy && !state.ended) {
     // 入力待ちになった時刻を記録。長時間放置後の音声復帰・タイマーずれ対策に使う。
     lastInputReadyAt = performance.now();
-    startScoreAttackTimer();
   } else {
     stopScoreAttackTimer();
   }
@@ -2726,8 +2797,8 @@ function debugSetDraw(value) {
   state.pot = medalForDrawCount(value);
   state.drawWarningShown = value >= getDrawWarningCount();
   updateScore();
-  showMessage(`あいこ ${value} 回 / メダル ${state.pot}`);
-  setDebugAnswerText(`あいこ ${value} 回\nメダル ${state.pot} まい`);
+  showMessage(`あいこ ${value} 回 / メダル ${formatScoreValue(state.pot)}`);
+  setDebugAnswerText(`あいこ ${value} 回\nメダル ${formatScoreValue(state.pot)} まい`);
 }
 
 function debugForceWarning() {
@@ -2749,8 +2820,8 @@ function debugForceChance() {
   setCharacter("excited");
   clearCinematicCutIn();
   AudioManager.switchBgm("chance");
-  showMessage(`あいこ ${state.draw} 回 / メダル ${state.pot}`, "is-result is-draw player-draw is-chance-entry");
-  setDebugAnswerText(`あいこ ${state.draw} 回\nメダル ${state.pot} まい\nチャンス状態`);
+  showMessage(`あいこ ${state.draw} 回 / メダル ${formatScoreValue(state.pot)}`, "is-result is-draw player-draw is-chance-entry");
+  setDebugAnswerText(`あいこ ${state.draw} 回\nメダル ${formatScoreValue(state.pot)} まい\nチャンス状態`);
 }
 
 function debugForceFinal() {
@@ -2766,8 +2837,8 @@ function debugForceFinal() {
   setCharacter("excited");
   triggerCinematicCutIn("final");
   AudioManager.switchBgm("final");
-  showMessage(`あいこ ${state.draw} 回 / メダル ${state.pot}`, "is-result is-draw player-draw is-final-entry");
-  setDebugAnswerText(`あいこ ${state.draw} 回\nメダル ${state.pot} まい\nさいごの勝負`);
+  showMessage(`あいこ ${state.draw} 回 / メダル ${formatScoreValue(state.pot)}`, "is-result is-draw player-draw is-final-entry");
+  setDebugAnswerText(`あいこ ${state.draw} 回\nメダル ${formatScoreValue(state.pot)} まい\nさいごの勝負`);
 }
 
 function debugForceNextResult(result) {
@@ -2881,6 +2952,10 @@ function debugReset() {
 }
 
 function trackDebugToggleTap() {
+  if (!DEBUG_MODE) {
+    return false;
+  }
+
   const now = Date.now();
   state.debugSoundTaps = state.debugSoundTaps.filter((time) => now - time < 1800);
   state.debugSoundTaps.push(now);
@@ -2917,7 +2992,7 @@ function updateMedalRecordHud() {
   }
 
   const current = normalizeScoreValue(state.pot);
-  const best = Math.max(getBestMedalRecord(), current);
+  const best = maxScoreValue(getBestMedalRecord(), current);
   if (currentMedalRecord) {
     currentMedalRecord.textContent = formatScoreValue(current);
   }
@@ -3024,17 +3099,17 @@ function updateAikoGuideHud() {
 function updateScore() {
   const previousPotText = potCount?.textContent;
   winCount.textContent = formatScoreValue(state.win);
-  winCount.title = String(normalizeScoreValue(state.win));
+  winCount.title = scoreToTitle(state.win);
   loseCount.textContent = formatScoreValue(state.lose);
-  loseCount.title = String(normalizeScoreValue(state.lose));
+  loseCount.title = scoreToTitle(state.lose);
   if (drawCount) {
     drawCount.textContent = formatScoreValue(state.draw);
-    drawCount.title = String(normalizeScoreValue(state.draw));
+    drawCount.title = scoreToTitle(state.draw);
   }
   if (potCount) {
     const potText = formatScoreValue(state.pot);
     potCount.textContent = potText;
-    potCount.title = String(normalizeScoreValue(state.pot));
+    potCount.title = scoreToTitle(state.pot);
     const potBox = potCount.closest(".score-pot");
     if (previousPotText && previousPotText !== potText) {
       restartClassAnimation(potBox, "is-medal-up");
@@ -3104,7 +3179,7 @@ function setStageMood(mood) {
 }
 
 function scoreMood() {
-  const diff = state.win - state.lose;
+  const diff = scoreDiffAsNumber(state.win, state.lose);
 
   if (state.finalJanken) {
     return "final";
@@ -3258,7 +3333,7 @@ function postTrueStartLine() {
   const status = scoreAttackStatusLine(0);
   const rule = scoreAttackTimerRuleLine(0);
 
-  if (record > 0 || medalRecord > 0) {
+  if (record > 0 || scoreGreaterThan(medalRecord, 0)) {
     return `${status}
 ${rule}`;
   }
@@ -3372,13 +3447,13 @@ ${scoreAttackFlavorLine()}`;
 
 function medalNewRecordLine(scoreChange) {
   const current = scoreChange?.medalRecordCurrent || state.pot;
-  const previous = scoreChange?.medalRecordPrevious || 0;
+  const previous = scoreChange?.medalRecordPrevious || 0n;
 
-  if (current >= 1000000000000000) {
+  if (scoreAtLeast(current, 1000000000000000n)) {
     return `新記録！\n${formatScoreValue(current)} メダル！`;
   }
 
-  if (current >= 1000000) {
+  if (scoreAtLeast(current, 1000000n)) {
     return `記録更新！\n${formatScoreValue(current)} メダル`;
   }
 
@@ -3390,7 +3465,7 @@ function lineFor(scene) {
   const set = currentDialogue();
   const lines = [...(set[scene] || dialogue.even[scene] || [])];
 
-  if ((state.win >= MATCH_POINT * 0.78 || state.lose >= MATCH_POINT * 0.78) && scene === "idle") {
+  if ((scoreAtLeast(state.win, MATCH_POINT * 0.78) || scoreAtLeast(state.lose, MATCH_POINT * 0.78)) && scene === "idle") {
     lines.push(...endgameLines);
   }
 
@@ -3418,7 +3493,7 @@ function medalForDrawCount(drawCount) {
   const count = Math.max(0, Number(drawCount) || 0);
 
   for (let i = 0; i < count; i += 1) {
-    value = Math.min(MAX_メダル, value * JACKメダル_MULTIPLIER);
+    value = scoreMin(MAX_メダル, value * JACKメダル_MULTIPLIER);
   }
 
   return value;
@@ -3503,6 +3578,11 @@ function hideScoreAttackTimer() {
 }
 
 function stopScoreAttackTimer(hide = true) {
+  if (scoreAttackTimerStartDelayTimer) {
+    window.clearTimeout(scoreAttackTimerStartDelayTimer);
+    scoreAttackTimerStartDelayTimer = null;
+  }
+
   if (scoreAttackTimerTick) {
     window.clearInterval(scoreAttackTimerTick);
     scoreAttackTimerTick = null;
@@ -3521,6 +3601,24 @@ function stopScoreAttackTimer(hide = true) {
   }
 }
 
+function scheduleScoreAttackTimerStart(delayMs = 0) {
+  if (scoreAttackTimerStartDelayTimer) {
+    window.clearTimeout(scoreAttackTimerStartDelayTimer);
+    scoreAttackTimerStartDelayTimer = null;
+  }
+
+  if (!shouldRunScoreAttackTimer()) {
+    hideScoreAttackTimer();
+    return;
+  }
+
+  const delay = Math.max(0, Number(delayMs) || 0);
+  scoreAttackTimerStartDelayTimer = window.setTimeout(() => {
+    scoreAttackTimerStartDelayTimer = null;
+    startScoreAttackTimer();
+  }, delay);
+}
+
 function updateScoreAttackTimerDisplay() {
   if (!scoreAttackTimer || !scoreAttackTimerValue || !scoreAttackTimerLabel || !scoreAttackTimerDeadline) {
     return;
@@ -3530,7 +3628,7 @@ function updateScoreAttackTimerDisplay() {
   const secondsLeft = Math.max(0, Math.ceil(msLeft / 1000));
   const level = getScoreAttackLevel();
   scoreAttackTimerValue.textContent = String(secondsLeft);
-  scoreAttackTimerLabel.textContent = `LV ${level} / TIME`;
+  scoreAttackTimerLabel.textContent = `LV ${level} / じかん`;
   scoreAttackTimer.hidden = false;
   scoreAttackTimer.classList.toggle("is-danger", secondsLeft <= 3);
   scoreAttackTimer.classList.toggle("is-urgent", secondsLeft <= 1);
@@ -3600,7 +3698,7 @@ async function handleScoreAttackTimeout() {
     result: "lose",
   };
 
-  state.lose += payout;
+  state.lose = scoreAdd(state.lose, payout);
   state.pot = BASE_メダル;
   state.draw = 0;
   state.drawWarningShown = false;
@@ -4378,8 +4476,8 @@ function createReadCue() {
   const trueEndSeen = progress.trueEndSeen === true;
   const phase = getRelationshipPhase();
   const draw = state.draw;
-  const playerAhead = state.win - state.lose;
-  const cpuAhead = state.lose - state.win;
+  const playerAhead = scoreDiffAsNumber(state.win, state.lose);
+  const cpuAhead = scoreDiffAsNumber(state.lose, state.win);
 
   let pool;
 
@@ -4502,7 +4600,7 @@ let hideTeachingStage = null;
     dynamicMode = "avoid";
     imageMood = "smug";
     honest = false;
-    ruleText = "見せ手を外す";
+    ruleText = "言った手以外";
   } else if (feeling === "mirror") {
     wordHand = null;
     cpuHand = null;
@@ -4525,7 +4623,7 @@ let hideTeachingStage = null;
     ruleText = "今の言葉に合わせる";
   } else if (feeling === "panic") {
     imageMood = "panic";
-    ruleText = "そのまま";
+    ruleText = "先に見えた手";
   } else if (feeling === "trueEnd") {
     imageMood = "happy";
     ruleText = "同じ手";
@@ -4552,7 +4650,7 @@ let hideTeachingStage = null;
         : dynamicMode === "sway"
           ? "今の言葉＝あいてが合わせる"
           : feeling === "panic"
-            ? "見えてる手＝あいこ"
+            ? "先に見えた手＝あいこ"
             : feeling === "hide"
               ? (hideTeachingStage === "icon" || hideTeachingStage === "hybrid"
                 ? "手アイコン＋ポーズ＝あいこ"
@@ -4670,17 +4768,20 @@ function showNextInputPrompt() {
   if (showPostTrueStartMessage()) {
     setDebugAnswerNoHint("これは説明メッセージです。");
     showInputGuideOnce();
+    scheduleScoreAttackTimerStart(1450);
     return;
   }
 
   if (showHintGuideMessage()) {
     setDebugAnswerNoHint("これは遊び方の説明です。");
     showInputGuideOnce();
+    scheduleScoreAttackTimerStart(1350);
     return;
   }
 
   if (maybeStartPsychEvent()) {
     showInputGuideOnce();
+    scheduleScoreAttackTimerStart(1250);
     return;
   }
 
@@ -4694,6 +4795,7 @@ function showNextInputPrompt() {
   }
 
   showInputGuideOnce();
+  scheduleScoreAttackTimerStart(980);
 }
 
 function updateCharacterByScore() {
@@ -4938,7 +5040,7 @@ function setResultLabel(result, bonus = 1, isFinal = false) {
     return;
   }
 
-  const showJackpot = !isFinal && Number(bonus) > BASE_メダル;
+  const showJackpot = !isFinal && scoreGreaterThan(bonus, BASE_メダル);
   const showFinal = isFinal && result !== "draw";
 
   if (showFinal) {
@@ -5412,6 +5514,19 @@ function retryVisibleCharactersSoon() {
 ["visibilitychange", "focus", "online", "pageshow"].forEach((eventName) => {
   window.addEventListener(eventName, () => retryVisibleCharactersSoon(120), { passive: true });
 });
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    stopScoreAttackTimer();
+    return;
+  }
+
+  scheduleScoreAttackTimerStart(650);
+}, { passive: true });
+
+window.addEventListener("pageshow", () => {
+  scheduleScoreAttackTimerStart(650);
+}, { passive: true });
 
 function fallbackSceneIllustration() {
   const mood = sceneOverlay.dataset.fallbackMood || "normal";
@@ -6158,8 +6273,8 @@ function resetScore() {
   clearPendingChoice();
   stopPsychCueMotion();
   clearCinematicCutIn();
-  state.win = 0;
-  state.lose = 0;
+  state.win = 0n;
+  state.lose = 0n;
   state.draw = 0;
   state.pot = BASE_メダル;
   state.drawWarningShown = false;
@@ -6173,7 +6288,7 @@ function resetScore() {
   state.postTrueNewRecordShownFor = 0;
   state.bestMedalRecord = loadBestMedalRecord();
   state.medalNewRecord = false;
-  state.medalNewRecordValue = 0;
+  state.medalNewRecordValue = 0n;
   state.lastLine = "";
   state.lastMissHint = null;
   state.feelingCueSeen = {};
@@ -6488,8 +6603,8 @@ function restartMatch() {
 
 function addRoundScore(result) {
   const scoreChange = {
-    bonus: 1,
-    points: 0,
+    bonus: 1n,
+    points: 0n,
     potBefore: state.pot,
     warningStarted: false,
     chanceStarted: false,
@@ -6507,7 +6622,7 @@ function addRoundScore(result) {
 
   if (result === "draw") {
     state.draw += 1;
-    state.pot = Math.min(MAX_メダル, state.pot * JACKメダル_MULTIPLIER);
+    state.pot = scoreMin(MAX_メダル, state.pot * JACKメダル_MULTIPLIER);
     scoreChange.points = state.pot;
     const medalRecord = maybeUpdateBestMedalRecord(state.pot);
     scoreChange.medalNewRecord = medalRecord.announce;
@@ -6557,16 +6672,16 @@ function addRoundScore(result) {
     scoreChange.finalResolved = true;
     scoreChange.finalResult = result;
     if (result === "win") {
-      state.win += payout;
+      state.win = scoreAdd(state.win, payout);
     } else if (result === "lose") {
-      state.lose += payout;
+      state.lose = scoreAdd(state.lose, payout);
     }
     state.pot = BASE_メダル;
     state.draw = 0;
     return scoreChange;
   }
 
-  state[result] += payout;
+  state[result] = scoreAdd(state[result], payout);
   state.pot = BASE_メダル;
   state.draw = 0;
   state.drawWarningShown = false;
@@ -6733,9 +6848,9 @@ async function playRound(player) {
   updateScore();
   const cpuMood = cpuMoodForResult(result);
   if (result === "win") {
-    setCharacter(state.win - state.lose >= 12 ? "panic" : "worried");
+    setCharacter(scoreDiffAsNumber(state.win, state.lose) >= 12 ? "panic" : "worried");
   } else if (result === "lose") {
-    setCharacter(state.lose - state.win >= 12 ? "smug" : "happy");
+    setCharacter(scoreDiffAsNumber(state.lose, state.win) >= 12 ? "smug" : "happy");
   } else {
     setCharacter(state.chance ? "excited" : "draw");
   }
@@ -6811,7 +6926,7 @@ async function playRound(player) {
 
   state.nextCallMode = result === "draw" ? "draw" : "normal";
 
-  const roundEndsMatch = scoreChange.finalResolved || scoreChange.postTrueCompleted || state.win >= MATCH_POINT || state.lose >= MATCH_POINT;
+  const roundEndsMatch = scoreChange.finalResolved || scoreChange.postTrueCompleted || scoreAtLeast(state.win, MATCH_POINT) || scoreAtLeast(state.lose, MATCH_POINT);
   const resultPauseBase = roundEndsMatch
     ? 2300
     : scoreChange.chanceStarted
@@ -6833,7 +6948,7 @@ async function playRound(player) {
     if (scoreChange.postTrueCompleted) {
       await endPostTrueCompletion(scoreChange.postTrueCompleteResult || "lose", scoreChange);
     } else {
-      endGame(scoreChange.finalResolved ? scoreChange.finalResult : state.win >= MATCH_POINT ? "win" : "lose");
+      endGame(scoreChange.finalResolved ? scoreChange.finalResult : scoreAtLeast(state.win, MATCH_POINT) ? "win" : "lose");
     }
     endPlayRoundTimer();
     return;
