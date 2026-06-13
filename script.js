@@ -547,7 +547,7 @@ const DEBUG_MODE = urlParams.has("debug");
 const DEBUG_KEY_SEQUENCE = ["up", "up", "down", "down", "left", "right", "left", "right", "b", "a"];
 const DEBUG_TOUCH_SEQUENCE = ["up", "up", "down", "down", "left", "right", "left", "right", "center", "center"];
 const DEBUG_COMMAND_TIMEOUT_MS = 10000;
-const ASSET_VERSION = "20260613-lv100-arcade-over1";
+const ASSET_VERSION = "20260613-lv100-text-tune1";
 
 function assetPath(src) {
   if (!src || /^(?:data:|blob:|https?:)/.test(src) || src.includes("?v=")) {
@@ -4114,15 +4114,15 @@ function scoreAttackFlavorLine(drawValue = state.draw) {
   const stage = scoreAttackStageForLevel(level);
 
   if (stage.rank >= 7) {
-    return randomLine(["カウンタが、笑ってるにょ", "店員さん、来るかも", "ここから先は暗転だよ"]);
+    return randomLine(["カウンタが、笑ってるだどん", "店員さん、来るかも", "ここから先は暗転だべ", "筐体の音が変だわさ"]);
   }
 
   if (stage.rank >= 6) {
-    return randomLine(["もう、音しか聞こえないね", "ここから先は、手元だけ見て", "5秒だけ、待つね", "世界が少しズレたにゃ"]);
+    return randomLine(["もう、音しか聞こえないね", "ここから先は、手元だけ見て", "5秒だけ、待つね", "世界が少しズレたにゃ", "字幕が昭和になってきたじゃよ"]);
   }
 
   if (stage.rank >= 5) {
-    return randomLine(["メダルの音、止まらないね", "まだ足りないって顔してる", "次も読めるよね？", "少し急がないとね", "ね、今の語尾へんだった？"]);
+    return randomLine(["メダルの音、止まらないね", "まだ足りないって顔してる", "次も読めるよね？", "少し急がないとね", "語尾が迷子なのだ", "村の放送みたいだべ"]);
   }
 
   if (stage.rank >= 4) {
@@ -4619,7 +4619,7 @@ function swayIntervalForCue() {
 function swayCueLine(cue) {
   const hand = cue?.activeHand || cue?.cpuHand || cue?.wordHand || randomCpuHand();
   const level = Number(cue?.scoreLevel || (isScoreAttackMode() ? getScoreAttackLevel() : 0));
-  const suffix = level >= 85 ? randomLine(["にゃ", "にょ", ""]) : "";
+  const suffix = level >= 85 ? randomLine(["にゃ", "だべ", ""]) : "";
   return `${handName(hand)}に\nしようかな…${suffix}`;
 }
 
@@ -4733,15 +4733,19 @@ function markReadCueDifficulty(cue) {
 
 function scoreAttackGlitchSuffix(scoreLevel) {
   const level = Number(scoreLevel || 0);
+
   if (level >= 95) {
-    return randomLine(["にょ", "にゃ", "…エラー"]);
+    return randomLine(["にゃ", "だどん", "だべ", "だわさ", "なのだ", "じゃよ"]);
   }
+
   if (level >= 80) {
-    return randomLine(["にゃ", "にょ", ""]);
+    return randomLine(["にゃ", "だべ", "なのだ", "だわさ", ""]);
   }
+
   if (level >= 60) {
-    return randomLine(["…", "", "ね"]);
+    return randomLine(["…", "ね", "だべ", ""]);
   }
+
   return "";
 }
 
@@ -4778,7 +4782,7 @@ function lineTemplatesForCue(cue) {
     if (scoreMad) {
       return [
         `${cpu}で\n続けよ`,
-        `${cpu}で\nにゃっと合わせよ`,
+        `${cpu}で\n合わせるだべ`,
       ];
     }
 
@@ -6999,7 +7003,7 @@ async function endPostTrueCompletion(result, scoreChange) {
 
   setCharacter("panic");
   AudioManager.playSound("focus");
-  showMessage("これ以上は\n店員さんに怒られるにょ", "is-result is-cue-special is-score-terminal", {
+  showMessage("これ以上は\n店員さんに怒られるだべ", "is-result is-cue-special is-score-terminal", {
     typewriter: true,
     maxDuration: 2100,
   });

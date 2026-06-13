@@ -1,15 +1,15 @@
-Patch: LV100 arcade over
-Version: 20260613-lv100-arcade-over1
+Patch: LV100 text tune
+Version: 20260613-lv100-text-tune1
 
 node --check: OK
 
 node --check OK
 
 Static checks:
-- no bait guard: OK
-- lv100 badge key: OK
-- save badge on completion: OK
-- title badge: OK
-- terminal sequence: OK
-- readable bait lines: OK
+- no rejected bait guard: OK
+- no nyo wording: OK
+- dialect suffixes: OK
+- lv100 badge: OK
+- lv100 terminal sequence: OK
+- readable bait: OK
 - node syntax: OK
