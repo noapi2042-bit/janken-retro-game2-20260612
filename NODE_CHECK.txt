@@ -1,12 +1,11 @@
-Patch: sound button debug
-Version: 20260613-sound-button-debug1
+Patch: gameover hint wording
+Version: 20260613-gameover-hint-wording1
 
 node --check: OK
 
 node --check OK
 
 Static checks:
-- sound button five taps without DEBUG_MODE gate: OK
-- sound button unlockDebugCommand: OK
-- touch command prevent default during progress: OK
+- ambiguous phrase removed: OK
+- new wording exists: OK
 - node syntax: OK

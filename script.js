@@ -550,7 +550,7 @@ const DEBUG_MODE = urlParams.has("debug");
 const DEBUG_KEY_SEQUENCE = ["up", "up", "down", "down", "left", "right", "left", "right", "b", "a"];
 const DEBUG_TOUCH_SEQUENCE = ["up", "up", "down", "down", "left", "right", "left", "right", "center", "center"];
 const DEBUG_COMMAND_TIMEOUT_MS = 10000;
-const ASSET_VERSION = "20260613-sound-button-debug1";
+const ASSET_VERSION = "20260613-gameover-hint-wording1";
 
 function assetPath(src) {
   if (!src || /^(?:data:|blob:|https?:)/.test(src) || src.includes("?v=")) {
@@ -6210,7 +6210,7 @@ function getNextGoalHintLine(currentRouteId) {
   }
 
   if (missingRoutes.includes("gameOver")) {
-    return "負けた時の私も、\n少しだけ見てほしいかも。";
+    return "まだ見てない終わり方も、\n少しだけ見てほしいかも。";
   }
 
   return "まだ見ていない思い出が\nどこかにあるよ。";
@@ -6236,8 +6236,8 @@ function endingLinesForRoute(routeId) {
     return [
       "チャンスまで来てくれたね。\nちょっと嬉しい。",
       "でも時々、迷ったり、\n試したりしちゃう。",
-      "迷った時は、\nあとに言った方が本音。",
-      "試してる時は、\n見せた手にひっかからないで。",
+      "迷った時は、\n今見えてる言葉が合図だよ。",
+      "試してる時は、\n言った手を外してね。",
       getNextGoalHintLine(routeId),
     ];
   }
