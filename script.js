@@ -2519,14 +2519,18 @@ function getNextTargetRoute(progress = getアルバムProgress()) {
   return "complete";
 }
 
+function isOnlyGameOverRouteRemaining(progress = getアルバムProgress()) {
+  const missingRoutes = getMissingアルバムRoutes(progress);
+  return missingRoutes.length === 1 && missingRoutes[0] === "gameOver";
+}
+
 function isScoreAttackMode(progress = getアルバムProgress()) {
   return progress.trueEndSeen === true;
 }
 
 function getMatchBgmMode(progress = getアルバムProgress()) {
   // じゃんけん中のBGMは、試合開始時にだけ決める。
-  // ただし「何回目か」だけで決めると、最後に gameOver 回収だけが残った時にも
-  // final BGM になってしまうため、現在の回収目標で決める。
+  // ただし最後に gameOver 回収だけが残った時は、終盤の空気を保つ。
   if (progress.trueEndSeen) {
     return "final"; // TRUE END後のスコアアタック
   }
@@ -2546,7 +2550,7 @@ function getMatchBgmMode(progress = getアルバムProgress()) {
   }
 
   if (targetRoute === "gameOver") {
-    return "normal"; // 負け回収は通常勝負として始める
+    return isOnlyGameOverRouteRemaining(progress) ? "final" : "normal";
   }
 
   return "normal";
