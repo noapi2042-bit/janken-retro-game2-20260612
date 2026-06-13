@@ -1,6 +1,12 @@
-Patch: hidden reset button
-Version: 20260613-hidden-reset-button1
+Patch: konami debug
+Version: 20260613-konami-debug1
 
 node --check: OK
 
 node --check OK
+
+Static checks:
+- keyboard sequence: OK
+- touch sequence: OK
+- debug unlock: OK
+- touch listener: OK

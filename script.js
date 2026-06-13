@@ -537,6 +537,8 @@ let scoreAttackTimerTimeout = null;
 let scoreAttackTimerStartDelayTimer = null;
 let scoreAttackTimerDeadline = 0;
 let scoreAttackTimerLimitSeconds = 0;
+let scoreAttackTimerPausedRemainingMs = 0;
+let scoreAttackTimerPausedByVisibility = false;
 let lastSpecialCueSignalAt = 0;
 
 const CHOICE_POINTER_ACTIVATION_SUPPRESS_MS = 420;
@@ -545,7 +547,10 @@ const CHOICE_BUFFER_MS = 900;
 
 const urlParams = new URLSearchParams(window.location.search);
 const DEBUG_MODE = urlParams.has("debug");
-const ASSET_VERSION = "20260613-hidden-reset-button1";
+const DEBUG_KEY_SEQUENCE = ["up", "up", "down", "down", "left", "right", "left", "right", "b", "a"];
+const DEBUG_TOUCH_SEQUENCE = ["up", "up", "down", "down", "left", "right", "left", "right", "center", "center"];
+const DEBUG_COMMAND_TIMEOUT_MS = 10000;
+const ASSET_VERSION = "20260613-konami-debug1";
 
 function assetPath(src) {
   if (!src || /^(?:data:|blob:|https?:)/.test(src) || src.includes("?v=")) {
@@ -1259,6 +1264,9 @@ const state = {
   debugAnswerVisible: DEBUG_MODE,
   debugAnswer: null,
   debugPanelVisible: false,
+  debugCommandUnlocked: DEBUG_MODE,
+  debugCommandIndex: 0,
+  debugCommandLastAt: 0,
   debugSoundTaps: [],
   galleryUnlockedSession: false,
   galleryJustUnlockedId: null,
@@ -1484,6 +1492,10 @@ function choiceButtonForHand(hand) {
 
 function handleKeyboardShortcut(event) {
   if (isTypingTarget(event.target)) {
+    return;
+  }
+
+  if (trackDebugCommandKey(event)) {
     return;
   }
 
@@ -1950,6 +1962,19 @@ const AudioManager = (() => {
     }
   }
 
+  function resumeBgm(mode = "normal") {
+    try {
+      resumeContext();
+      if (muted || !mode) {
+        return;
+      }
+
+      switchBgm(mode);
+    } catch (error) {
+      // BGM resume is optional.
+    }
+  }
+
   function tone(frequency, start, duration, options = {}) {
     if (!context) {
       return;
@@ -2109,12 +2134,8 @@ const AudioManager = (() => {
         }
       }
     } else {
-      resumeContext();
-      if (state.showingTrueEnding) {
-        playBgm("trueEnd");
-      } else if (state.started && !state.ended) {
-        playBgm(state.finalJanken ? "final" : state.chance ? "chance" : "normal");
-      }
+      const mode = typeof currentGameplayBgmMode === "function" ? currentGameplayBgmMode() : null;
+      resumeBgm(mode || null);
     }
 
     updateMuteButton();
@@ -2141,6 +2162,7 @@ const AudioManager = (() => {
     playBgm,
     switchBgm,
     stopBgm,
+    resumeBgm,
     playSound,
     playJankenCallSfx,
     playCutinSfx,
@@ -2395,6 +2417,18 @@ function getMatchBgmMode(progress = getアルバムProgress()) {
   }
 
   return "final"; // 3回目以降の試合、TRUE END後のスコアアタック
+}
+
+function currentGameplayBgmMode() {
+  if (state.showingTrueEnding) {
+    return "trueEnd";
+  }
+
+  if (state.started && !state.ended) {
+    return getMatchBgmMode();
+  }
+
+  return null;
 }
 
 function isGalleryTrainingMode(progress = getアルバムProgress()) {
@@ -2737,7 +2771,7 @@ function replayTrueEndFromアルバム() {
 function toggleDebugMode(force) {
   const shouldShow = typeof force === "boolean" ? force : !state.debugPanelVisible;
   state.debugPanelVisible = shouldShow;
-  cabinet.classList.toggle("is-debug", shouldShow || DEBUG_MODE);
+  cabinet.classList.toggle("is-debug", shouldShow || DEBUG_MODE || state.debugCommandUnlocked);
 
   if (shouldShow) {
     state.debugAnswerVisible = true;
@@ -2787,7 +2821,7 @@ function createDebugPanel() {
 
   const description = document.createElement("p");
   description.className = "debug-note";
-  description.textContent = "開発用です。こたえは左下。リセットで記録も消えます。";
+  description.textContent = "検証用です。こたえは左下。スクショ確認に使えます。";
   panel.append(description);
 
   [
@@ -3027,6 +3061,170 @@ function trackDebugToggleTap() {
   }
 
   return false;
+}
+
+function normalizeDebugCommandKey(key) {
+  const normalized = String(key || "").toLowerCase();
+
+  if (normalized === "arrowup" || normalized === "w") {
+    return "up";
+  }
+
+  if (normalized === "arrowdown" || normalized === "s") {
+    return "down";
+  }
+
+  if (normalized === "arrowleft" || normalized === "q") {
+    return "left";
+  }
+
+  if (normalized === "arrowright" || normalized === "e") {
+    return "right";
+  }
+
+  if (normalized === "b") {
+    return "b";
+  }
+
+  if (normalized === "a") {
+    return "a";
+  }
+
+  return "";
+}
+
+function unlockDebugCommand(source = "secret") {
+  state.debugCommandUnlocked = true;
+  state.debugCommandIndex = 0;
+  state.debugCommandLastAt = 0;
+  state.debugAnswerVisible = true;
+  toggleDebugMode(true);
+  setDebugAnswerText("ひみつのテストを開きました。\nこたえ表示で確認できます。");
+  showMessage("ひみつのテスト\nこたえ表示ON", "is-cue-special", {
+    typewriter: true,
+    maxDuration: 1300,
+    speed: 42,
+  });
+
+  try {
+    console.info(`[janken] debug unlocked: ${source}`);
+  } catch (error) {
+    // console may be unavailable.
+  }
+}
+
+function trackDebugCommandToken(token, sequence = DEBUG_KEY_SEQUENCE, source = "key") {
+  if (!token || !sequence?.length) {
+    return false;
+  }
+
+  const now = performance.now();
+  if (now - state.debugCommandLastAt > DEBUG_COMMAND_TIMEOUT_MS) {
+    state.debugCommandIndex = 0;
+  }
+
+  state.debugCommandLastAt = now;
+
+  const expected = sequence[state.debugCommandIndex];
+  if (token === expected) {
+    state.debugCommandIndex += 1;
+  } else {
+    state.debugCommandIndex = token === sequence[0] ? 1 : 0;
+  }
+
+  if (state.debugCommandIndex >= sequence.length) {
+    unlockDebugCommand(source);
+    return true;
+  }
+
+  return false;
+}
+
+function trackDebugCommandKey(event) {
+  if (!event || event.repeat) {
+    return false;
+  }
+
+  const token = normalizeDebugCommandKey(event.key);
+  if (!token) {
+    return false;
+  }
+
+  const before = state.debugCommandIndex;
+  const unlocked = trackDebugCommandToken(token, DEBUG_KEY_SEQUENCE, "keyboard");
+
+  if (unlocked) {
+    event.preventDefault();
+    event.stopPropagation();
+    return true;
+  }
+
+  // コマンド入力中だけ、矢印キーによるページ操作や別処理を軽く抑える。
+  if (before > 0 || state.debugCommandIndex > 0) {
+    event.preventDefault();
+    return true;
+  }
+
+  return false;
+}
+
+function canTrackDebugTouchCommand() {
+  return Boolean(
+    !state.started &&
+      !state.busy &&
+      !state.ended &&
+      !sceneDialogActive &&
+      (!galleryOverlay || galleryOverlay.hidden)
+  );
+}
+
+function debugTouchTokenFromPoint(event) {
+  if (!cabinet || !event) {
+    return "";
+  }
+
+  const rect = cabinet.getBoundingClientRect();
+  if (!rect.width || !rect.height) {
+    return "";
+  }
+
+  const x = (event.clientX - rect.left) / rect.width;
+  const y = (event.clientY - rect.top) / rect.height;
+
+  if (y < 0.28) {
+    return "up";
+  }
+
+  if (y > 0.72) {
+    return "down";
+  }
+
+  if (x < 0.32) {
+    return "left";
+  }
+
+  if (x > 0.68) {
+    return "right";
+  }
+
+  return "center";
+}
+
+function handleDebugTouchCommand(event) {
+  if (!canTrackDebugTouchCommand()) {
+    return;
+  }
+
+  const token = debugTouchTokenFromPoint(event);
+  if (!token) {
+    return;
+  }
+
+  const unlocked = trackDebugCommandToken(token, DEBUG_TOUCH_SEQUENCE, "touch");
+  if (unlocked) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
 }
 
 function clearChoicePressState(targetButton = null) {
@@ -3637,7 +3835,7 @@ function hideScoreAttackTimer() {
   }
 }
 
-function stopScoreAttackTimer(hide = true) {
+function clearScoreAttackTimerHandles() {
   if (scoreAttackTimerStartDelayTimer) {
     window.clearTimeout(scoreAttackTimerStartDelayTimer);
     scoreAttackTimerStartDelayTimer = null;
@@ -3652,20 +3850,66 @@ function stopScoreAttackTimer(hide = true) {
     window.clearTimeout(scoreAttackTimerTimeout);
     scoreAttackTimerTimeout = null;
   }
+}
 
+function stopScoreAttackTimer(hide = true) {
+  clearScoreAttackTimerHandles();
   scoreAttackTimerDeadline = 0;
   scoreAttackTimerLimitSeconds = 0;
+  scoreAttackTimerPausedRemainingMs = 0;
+  scoreAttackTimerPausedByVisibility = false;
 
   if (hide) {
     hideScoreAttackTimer();
   }
 }
 
-function scheduleScoreAttackTimerStart(delayMs = 0) {
+function pauseScoreAttackTimerForVisibility() {
+  if (!scoreAttackTimerDeadline && !scoreAttackTimerStartDelayTimer) {
+    stopScoreAttackTimer();
+    return;
+  }
+
+  const remaining = scoreAttackTimerDeadline
+    ? Math.max(850, scoreAttackTimerDeadline - performance.now())
+    : 0;
+
+  clearScoreAttackTimerHandles();
+  scoreAttackTimerDeadline = 0;
+  scoreAttackTimerPausedRemainingMs = remaining;
+  scoreAttackTimerPausedByVisibility = remaining > 0;
+  hideScoreAttackTimer();
+}
+
+function resumeScoreAttackTimerFromVisibility(delayMs = 650) {
+  if (!shouldRunScoreAttackTimer()) {
+    stopScoreAttackTimer();
+    return;
+  }
+
+  if (!scoreAttackTimerPausedByVisibility || scoreAttackTimerPausedRemainingMs <= 0) {
+    scheduleScoreAttackTimerStart(delayMs);
+    return;
+  }
+
+  const remaining = scoreAttackTimerPausedRemainingMs;
+  scoreAttackTimerPausedRemainingMs = 0;
+  scoreAttackTimerPausedByVisibility = false;
+
   if (scoreAttackTimerStartDelayTimer) {
     window.clearTimeout(scoreAttackTimerStartDelayTimer);
-    scoreAttackTimerStartDelayTimer = null;
   }
+
+  scoreAttackTimerStartDelayTimer = window.setTimeout(() => {
+    scoreAttackTimerStartDelayTimer = null;
+    startScoreAttackTimer(remaining);
+  }, Math.max(0, Number(delayMs) || 0));
+}
+
+function scheduleScoreAttackTimerStart(delayMs = 0) {
+  clearScoreAttackTimerHandles();
+  scoreAttackTimerPausedRemainingMs = 0;
+  scoreAttackTimerPausedByVisibility = false;
 
   if (!shouldRunScoreAttackTimer()) {
     hideScoreAttackTimer();
@@ -3705,18 +3949,24 @@ function shouldRunScoreAttackTimer() {
   );
 }
 
-function startScoreAttackTimer() {
-  stopScoreAttackTimer(false);
+function startScoreAttackTimer(remainingMs = null) {
+  clearScoreAttackTimerHandles();
 
   if (!shouldRunScoreAttackTimer()) {
-    hideScoreAttackTimer();
+    stopScoreAttackTimer();
     return;
   }
 
   const level = getScoreAttackLevel();
   const seconds = scoreAttackTimeLimitSeconds(level);
+  const durationMs = Number.isFinite(Number(remainingMs)) && Number(remainingMs) > 0
+    ? Math.max(850, Number(remainingMs))
+    : seconds * 1000;
+
   scoreAttackTimerLimitSeconds = seconds;
-  scoreAttackTimerDeadline = performance.now() + seconds * 1000;
+  scoreAttackTimerDeadline = performance.now() + durationMs;
+  scoreAttackTimerPausedRemainingMs = 0;
+  scoreAttackTimerPausedByVisibility = false;
   updateScoreAttackTimerDisplay();
 
   scoreAttackTimerTick = window.setInterval(() => {
@@ -3725,7 +3975,7 @@ function startScoreAttackTimer() {
 
   scoreAttackTimerTimeout = window.setTimeout(() => {
     handleScoreAttackTimeout();
-  }, seconds * 1000 + 80);
+  }, durationMs + 80);
 }
 
 async function handleScoreAttackTimeout() {
@@ -3996,7 +4246,7 @@ function setDebugAnswerText(text) {
 }
 
 function shouldMaintainDebugAnswerHud() {
-  return Boolean(DEBUG_MODE || state.debugPanelVisible || state.debugAnswerVisible || document.querySelector("#debugAnswerHud"));
+  return Boolean(DEBUG_MODE || state.debugCommandUnlocked || state.debugPanelVisible || state.debugAnswerVisible || document.querySelector("#debugAnswerHud"));
 }
 
 function setDebugAnswerNoHint(reason = "") {
@@ -5472,11 +5722,28 @@ function loadImageDirectlyWithFallback(imgElement, fallbackElement, sources, opt
   }
 
   const candidates = uniqueImageSources(sources);
+  const resolvedCandidates = candidates.map((src) => assetPath(src));
+  const sourcesKey = resolvedCandidates.join("|");
   const priority = options.priority || "high";
   const isCurrent = typeof options.isCurrent === "function" ? options.isCurrent : () => true;
   let index = 0;
 
+  // 同じ候補リストで既に表示できているなら、srcを入れ直さない。
+  // これだけでスマホの「じゃんけんぽん」中の画像再デコード/ちらつきをかなり減らせる。
+  if (
+    sourcesKey &&
+    imgElement.dataset.sourcesKey === sourcesKey &&
+    imgElement.dataset.loadedSrc &&
+    !imgElement.hidden &&
+    imgElement.complete &&
+    imgElement.naturalWidth > 0
+  ) {
+    fallbackElement.hidden = true;
+    return;
+  }
+
   prepareRuntimeImage(imgElement, priority);
+  imgElement.dataset.sourcesKey = sourcesKey;
   imgElement.onload = null;
   imgElement.onerror = null;
 
@@ -5485,6 +5752,7 @@ function loadImageDirectlyWithFallback(imgElement, fallbackElement, sources, opt
       return;
     }
 
+    delete imgElement.dataset.loadedSrc;
     imgElement.hidden = true;
     imgElement.removeAttribute("src");
     fallbackElement.hidden = false;
@@ -5495,20 +5763,30 @@ function loadImageDirectlyWithFallback(imgElement, fallbackElement, sources, opt
       return;
     }
 
-    const src = candidates[index];
+    const resolvedSrc = resolvedCandidates[index];
     index += 1;
 
-    if (!src) {
+    if (!resolvedSrc) {
       failToFallback();
       return;
     }
 
-    const resolvedSrc = assetPath(src);
+    if (
+      imgElement.dataset.loadedSrc === resolvedSrc &&
+      !imgElement.hidden &&
+      imgElement.complete &&
+      imgElement.naturalWidth > 0
+    ) {
+      fallbackElement.hidden = true;
+      return;
+    }
+
     imgElement.onload = () => {
       if (!isCurrent()) {
         return;
       }
 
+      imgElement.dataset.loadedSrc = resolvedSrc;
       imgElement.hidden = false;
       fallbackElement.hidden = true;
     };
@@ -5536,7 +5814,13 @@ function characterSourcesForMood(mood) {
 
 function showLoadedCharacterImage(imgElement, fallbackElement, src, priority = "high") {
   prepareRuntimeImage(imgElement, priority);
-  imgElement.src = src;
+  const resolvedSrc = assetPath(src);
+
+  if (imgElement.dataset.loadedSrc !== resolvedSrc) {
+    imgElement.src = resolvedSrc;
+    imgElement.dataset.loadedSrc = resolvedSrc;
+  }
+
   imgElement.hidden = false;
   fallbackElement.hidden = true;
 }
@@ -5577,15 +5861,17 @@ function retryVisibleCharactersSoon() {
 
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
-    stopScoreAttackTimer();
+    pauseScoreAttackTimerForVisibility();
     return;
   }
 
-  scheduleScoreAttackTimerStart(650);
+  resumeScoreAttackTimerFromVisibility(650);
+  AudioManager.resumeBgm(currentGameplayBgmMode());
 }, { passive: true });
 
 window.addEventListener("pageshow", () => {
-  scheduleScoreAttackTimerStart(650);
+  resumeScoreAttackTimerFromVisibility(650);
+  AudioManager.resumeBgm(currentGameplayBgmMode());
 }, { passive: true });
 
 function fallbackSceneIllustration() {
@@ -6062,7 +6348,7 @@ function renderHand(target, handKey) {
   target.append(image);
 }
 
-function resetRoundView() {
+function resetRoundView(options = {}) {
   stopPsychCueMotion();
   clearPreRevealedHands();
   renderHand(playerHand, null);
@@ -6070,7 +6356,12 @@ function resetRoundView() {
   setSelectedButton();
   clearResultLabel();
   setStageMood();
-  updateCharacterByScore();
+
+  // じゃんけん開始直後に毎回キャラ画像を読み直すと、スマホで「ぽん！」前後が重く見える。
+  // 入力待ちで表示済みのキャラを保ち、結果が出た後だけ表情を変える。
+  if (!options.keepCharacter) {
+    updateCharacterByScore();
+  }
 }
 
 function randomCpuHand(options = {}) {
@@ -6844,7 +7135,7 @@ async function playRound(player) {
   state.finalConfirmHand = null;
   cabinet.classList.remove("is-final-confirm");
   stopChanceMessages();
-  resetRoundView();
+  resetRoundView({ keepCharacter: true });
   AudioManager.playSound("select");
   if (recoverFromLongIdle) {
     // 長時間待った後はスマホの音声・タイマーが寝ていることがあるので、掛け声前に少し整える。
@@ -7042,6 +7333,7 @@ galleryImage?.addEventListener("click", replayTrueEndFromアルバム);
 sceneOverlay?.addEventListener("pointerup", advanceSceneDialog);
 sceneNextButton?.addEventListener("click", advanceSceneDialog);
 document.addEventListener("keydown", handleKeyboardShortcut);
+document.addEventListener("pointerdown", handleDebugTouchCommand, { capture: true, passive: false });
 muteButton.addEventListener("click", () => {
   AudioManager.initAudio();
   if (trackDebugToggleTap()) {
